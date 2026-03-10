@@ -16,6 +16,7 @@ WORKDIR /app
 
 COPY --from=builder /app/shared/dist ./shared/dist
 COPY --from=builder /app/shared/package.json ./shared/package.json
+COPY --from=builder /app/shared/node_modules ./shared/node_modules
 COPY --from=builder /app/poller/dist ./poller/dist
 COPY --from=builder /app/poller/node_modules ./poller/node_modules
 COPY --from=builder /app/poller/package.json ./poller/package.json
