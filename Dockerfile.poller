@@ -1,0 +1,26 @@
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Build shared package first
+COPY shared/package.json shared/tsconfig.json ./shared/
+COPY shared/src ./shared/src
+RUN cd shared && npm install && npm run build
+
+# Build poller
+COPY poller/package.json poller/tsconfig.json ./poller/
+COPY poller/src ./poller/src
+RUN cd poller && npm install && npm run build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+COPY --from=builder /app/shared/dist ./shared/dist
+COPY --from=builder /app/shared/package.json ./shared/package.json
+COPY --from=builder /app/poller/dist ./poller/dist
+COPY --from=builder /app/poller/node_modules ./poller/node_modules
+COPY --from=builder /app/poller/package.json ./poller/package.json
+
+ENV NODE_ENV=production
+EXPOSE 8080
+
+CMD ["node", "poller/dist/index.js"]
