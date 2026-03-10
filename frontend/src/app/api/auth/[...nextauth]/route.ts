@@ -28,15 +28,11 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user }) {
       const email = user.email?.toLowerCase() ?? '';
       const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase() ?? '';
-
-      // Admin always allowed
       if (email === adminEmail) return true;
-
-      // Check GCS allowed list
       const allowed = await getAllowedEmails();
       return allowed.includes(email);
     },
-    async session({ session, token }) {
+    async session({ session }) {
       if (session.user?.email) {
         const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase() ?? '';
         (session.user as any).isAdmin =
@@ -51,4 +47,5 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
-export default NextAuth(authOptions);
+const handler = NextAuth(authOptions);
+export { handler as GET, handler as POST };

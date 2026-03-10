@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "gcp-build": "cd ../shared && npm install && npm run build && cd ../frontend && npm install && next build",
     "build": "next build",
+    "dev": "next dev",
     "start": "next start",
     "lint": "next lint"
   },
