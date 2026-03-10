@@ -1,44 +1,29 @@
 #!/usr/bin/env bash
-# infra/deploy-poller.sh — Deploy or update the Cloud Run poller
+# Deploy the poller to Cloud Run using the Dockerfile explicitly
 set -euo pipefail
 
-PROJECT_ID="${GCP_PROJECT_ID:?Set GCP_PROJECT_ID}"
+PROJECT_ID="${GCP_PROJECT_ID:-classcharts}"
 REGION="${GCP_REGION:-europe-west2}"
-SERVICE_NAME="classcharts-poller"
-SA_EMAIL="classcharts-poller-sa@$PROJECT_ID.iam.gserviceaccount.com"
+SERVICE="classcharts-poller"
+SA="classcharts-poller-sa@${PROJECT_ID}.iam.gserviceaccount.com"
+IMAGE="gcr.io/${PROJECT_ID}/${SERVICE}"
 
-echo "▶ Building and deploying Cloud Run service: $SERVICE_NAME"
-
+echo "▶ Building and pushing Docker image..."
 cd "$(dirname "$0")/.."
 
-gcloud run deploy "$SERVICE_NAME" \
-  --source . \
-  --dockerfile Dockerfile.poller \
+gcloud builds submit \
+  --tag "$IMAGE" \
+  --file Dockerfile.poller \
+  .
+
+echo "▶ Deploying to Cloud Run..."
+gcloud run deploy "$SERVICE" \
+  --image "$IMAGE" \
   --region "$REGION" \
-  --service-account "$SA_EMAIL" \
+  --service-account "$SA" \
   --no-allow-unauthenticated \
-  --memory 256Mi \
-  --cpu 1 \
-  --timeout 60 \
-  --max-instances 1 \
-  --set-env-vars "GCP_PROJECT_ID=$PROJECT_ID" \
-  --project "$PROJECT_ID"
-
-SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" \
-  --region "$REGION" --format 'value(status.url)')
+  --set-secrets="PARENT1_EMAIL=PARENT1_EMAIL:latest,PARENT1_PASSWORD=PARENT1_PASSWORD:latest,GCP_PROJECT_ID=GCP_PROJECT_ID:latest,GCS_BUCKET=GCS_BUCKET:latest,GCS_ALLOWED_USERS_PATH=GCS_ALLOWED_USERS_PATH:latest,GMAIL_CLIENT_ID=GMAIL_CLIENT_ID:latest,GMAIL_CLIENT_SECRET=GMAIL_CLIENT_SECRET:latest,GMAIL_REFRESH_TOKEN=GMAIL_REFRESH_TOKEN:latest,GCAL_REFRESH_TOKEN=GCAL_REFRESH_TOKEN:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,PUSHOVER_API_TOKEN=PUSHOVER_API_TOKEN:latest,PUSHOVER_USER_KEY=PUSHOVER_USER_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,POLL_INTERVAL_MINUTES=POLL_INTERVAL_MINUTES:latest"
 
 echo ""
-echo "✅ Deployed: $SERVICE_URL"
-echo ""
-echo "▶ Creating Pub/Sub push subscription..."
-
-gcloud pubsub subscriptions create classcharts-poll-sub \
-  --topic=classcharts-poll \
-  --push-endpoint="$SERVICE_URL/" \
-  --push-auth-service-account="$SA_EMAIL" \
-  --ack-deadline=60 \
-  2>/dev/null || echo "Subscription already exists"
-
-echo ""
-echo "✅ Poller fully deployed and wired to Pub/Sub"
-echo "   Secrets still need setting — use Secret Manager or gcloud run services update --set-secrets"
+echo "✅ Poller deployed!"
+gcloud run services describe "$SERVICE" --region "$REGION" --format="value(status.url)"
