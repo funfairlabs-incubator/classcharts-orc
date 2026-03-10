@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Deploy the poller to Cloud Run using the Dockerfile explicitly
 set -euo pipefail
 
 PROJECT_ID="${GCP_PROJECT_ID:-classcharts}"
@@ -12,8 +11,8 @@ echo "▶ Building and pushing Docker image..."
 cd "$(dirname "$0")/.."
 
 gcloud builds submit \
-  --tag "$IMAGE" \
-  --dockerfile Dockerfile.poller \
+  --config cloudbuild.yaml \
+  --substitutions="_IMAGE=${IMAGE}" \
   .
 
 echo "▶ Deploying to Cloud Run..."
