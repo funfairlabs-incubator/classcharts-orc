@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Deploy frontend to App Engine with secrets injected into app.yaml
 set -euo pipefail
 
 PROJECT_ID="${GCP_PROJECT_ID:-classcharts}"
@@ -14,6 +13,8 @@ GOOGLE_CLIENT_ID=$(fetch_secret GOOGLE_CLIENT_ID)
 GOOGLE_CLIENT_SECRET=$(fetch_secret GOOGLE_CLIENT_SECRET)
 NEXTAUTH_SECRET=$(fetch_secret NEXTAUTH_SECRET)
 ADMIN_EMAIL=$(fetch_secret ADMIN_EMAIL)
+CC_EMAIL=$(fetch_secret CLASSCHARTS_PARENT1_EMAIL)
+CC_PASSWORD=$(fetch_secret CLASSCHARTS_PARENT1_PASSWORD)
 
 echo "▶ Building shared package..."
 cd "$REPO_ROOT/shared"
@@ -25,7 +26,6 @@ rm -rf "$REPO_ROOT/frontend/vendor/shared"
 mkdir -p "$REPO_ROOT/frontend/vendor/shared"
 cp -r "$REPO_ROOT/shared/dist"         "$REPO_ROOT/frontend/vendor/shared/dist"
 cp    "$REPO_ROOT/shared/package.json"  "$REPO_ROOT/frontend/vendor/shared/package.json"
-# Copy shared node_modules too so classcharts-api is available
 cp -r "$REPO_ROOT/shared/node_modules" "$REPO_ROOT/frontend/vendor/shared/node_modules"
 
 echo "▶ Updating frontend package.json to point at vendored shared..."
@@ -55,6 +55,8 @@ env_variables:
   GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
   NEXTAUTH_SECRET: "${NEXTAUTH_SECRET}"
   ADMIN_EMAIL: "${ADMIN_EMAIL}"
+  CLASSCHARTS_PARENT1_EMAIL: "${CC_EMAIL}"
+  CLASSCHARTS_PARENT1_PASSWORD: "${CC_PASSWORD}"
 beta_settings:
   cloud_build_timeout: "900"
 YAML
