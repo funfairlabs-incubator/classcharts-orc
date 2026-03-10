@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { getServerSession } from 'next-auth';
-import { authOptions } from './api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import { SessionProvider } from '@/components/layout/SessionProvider';
 import { AppShell } from '@/components/layout/AppShell';
 
