@@ -1,19 +1,17 @@
-runtime: nodejs20
-service: default
+runtime: nodejs22
 
-instance_class: F1  # Smallest instance — keeps costs minimal
+instance_class: F1
 
 automatic_scaling:
-  min_instances: 0
-  max_instances: 2
-  target_cpu_utilization: 0.65
+  min_idle_instances: 0
+  max_idle_instances: 1
 
 env_variables:
-  NODE_ENV: production
-  # All secrets should be injected via Secret Manager in production
-  # Set these via: gcloud app deploy --set-env-vars or use Secret Manager
+  NODE_ENV: "production"
+  GCP_PROJECT_ID: "classcharts"
+  GCS_BUCKET: "classcharts-attachments"
+  GCS_ALLOWED_USERS_PATH: "config/allowed-users.json"
+  NEXTAUTH_URL: "https://classcharts.appspot.com"
 
-handlers:
-  - url: /.*
-    script: auto
-    secure: always
+beta_settings:
+  cloud_build_timeout: "900"
