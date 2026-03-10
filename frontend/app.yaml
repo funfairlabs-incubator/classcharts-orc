@@ -1,0 +1,19 @@
+runtime: nodejs20
+service: default
+
+instance_class: F1  # Smallest instance — keeps costs minimal
+
+automatic_scaling:
+  min_instances: 0
+  max_instances: 2
+  target_cpu_utilization: 0.65
+
+env_variables:
+  NODE_ENV: production
+  # All secrets should be injected via Secret Manager in production
+  # Set these via: gcloud app deploy --set-env-vars or use Secret Manager
+
+handlers:
+  - url: /.*
+    script: auto
+    secure: always

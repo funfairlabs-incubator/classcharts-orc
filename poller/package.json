@@ -1,0 +1,22 @@
+{
+  "name": "classcharts-poller",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "@classcharts/shared": "file:../shared",
+    "@google-cloud/firestore": "^7.9.0",
+    "@google-cloud/storage": "^7.11.0",
+    "axios": "^1.7.0",
+    "googleapis": "^140.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0"
+  }
+}
