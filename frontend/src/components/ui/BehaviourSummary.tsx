@@ -1,63 +1,63 @@
-export async function BehaviourSummary() {
-  // TODO: replace with real data
-  const points = [
-    { id: 1, score: 2,  reason: 'Excellent homework submission', lesson: 'Mathematics',    teacher: 'Mr. Patel',    date: 'Mon' },
-    { id: 2, score: 1,  reason: 'Good participation in class',   lesson: 'English',        teacher: 'Ms. Harrison', date: 'Tue' },
-    { id: 3, score: -1, reason: 'Talking during lesson',         lesson: 'Science',        teacher: 'Dr. Chen',     date: 'Wed' },
-    { id: 4, score: 3,  reason: 'Outstanding project work',      lesson: 'Geography',      teacher: 'Mr. Thomson',  date: 'Thu' },
-  ];
+'use client';
+import { usePupil, useClassChartsData } from '@/lib/usePupil';
+import type { CCActivityPoint, CCBehaviourSummary } from '@classcharts/shared';
 
-  const total = points.reduce((sum, p) => sum + p.score, 0);
+interface BehaviourData {
+  activity: CCActivityPoint[];
+  summary: CCBehaviourSummary;
+}
+
+export function BehaviourSummary() {
+  const { activePupil } = usePupil();
+  const from = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+  const to = new Date().toISOString().split('T')[0];
+
+  const { data, loading, error } = useClassChartsData<BehaviourData>(
+    'behaviour',
+    { pupilId: String(activePupil?.id ?? ''), from, to },
+    [activePupil?.id],
+  );
+
+  if (loading) return <Skeleton />;
+  if (error) return <div className="card" style={{ padding: 20, fontSize: 13, color: 'var(--negative)' }}>{error}</div>;
+
+  const points = data?.activity ?? [];
+  const total = points.reduce((s, p) => s + p.score, 0);
+
+  if (points.length === 0) {
+    return <div className="card" style={{ padding: 20, fontSize: 13, color: 'var(--text-3)', textAlign: 'center' }}>No activity this week</div>;
+  }
 
   return (
     <div className="card" style={{ overflow: 'hidden' }}>
-      {/* Score header */}
       <div style={styles.scoreHeader}>
         <div>
           <p style={styles.scoreLabel}>Week total</p>
-          <p style={{
-            ...styles.scoreValue,
-            color: total >= 0 ? 'var(--positive)' : 'var(--negative)',
-          }}>
+          <p style={{ ...styles.scoreValue, color: total >= 0 ? 'var(--positive)' : 'var(--negative)' }}>
             {total > 0 ? '+' : ''}{total}
           </p>
         </div>
         <div style={styles.scoreBars}>
-          {points.map(p => (
-            <div
-              key={p.id}
-              title={`${p.score > 0 ? '+' : ''}${p.score} — ${p.reason}`}
-              style={{
-                ...styles.bar,
-                background: p.score > 0 ? 'var(--positive)' : 'var(--negative)',
-                height: Math.abs(p.score) * 10 + 8,
-                opacity: 0.7 + Math.abs(p.score) * 0.1,
-              }}
-            />
+          {points.slice(0, 8).map((p, i) => (
+            <div key={i} style={{
+              ...styles.bar,
+              background: p.polarity === 'positive' ? 'var(--positive)' : 'var(--negative)',
+              height: Math.min(Math.abs(p.score) * 10 + 8, 40),
+            }} />
           ))}
         </div>
       </div>
-
       <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
-
-      {/* Point list */}
-      {points.map((p, i) => (
-        <div
-          key={p.id}
-          style={{
-            ...styles.row,
-            borderBottom: i < points.length - 1 ? '1px solid var(--border)' : 'none',
-          }}
-        >
-          <span style={{
-            ...styles.score,
-            color: p.score > 0 ? 'var(--positive)' : 'var(--negative)',
-          }}>
+      {points.slice(0, 5).map((p, i) => (
+        <div key={p.id} style={{ ...styles.row, borderBottom: i < Math.min(points.length, 5) - 1 ? '1px solid var(--border)' : 'none' }}>
+          <span style={{ ...styles.score, color: p.polarity === 'positive' ? 'var(--positive)' : 'var(--negative)', background: p.polarity === 'positive' ? 'var(--positive-bg)' : 'var(--negative-bg)' }}>
             {p.score > 0 ? '+' : ''}{p.score}
           </span>
           <div style={styles.detail}>
             <span style={styles.reason}>{p.reason}</span>
-            <span style={styles.meta}>{p.lesson} · {p.teacher} · {p.date}</span>
+            <span style={styles.meta}>
+              {p.lessonName ?? ''}{p.teacherName ? ` · ${p.teacherName}` : ''}
+            </span>
           </div>
         </div>
       ))}
@@ -65,66 +65,19 @@ export async function BehaviourSummary() {
   );
 }
 
+function Skeleton() {
+  return <div className="card" style={{ padding: 20, height: 180, background: 'var(--surface-2)' }} />;
+}
+
 const styles: Record<string, React.CSSProperties> = {
-  scoreHeader: {
-    padding: '16px 20px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  scoreLabel: {
-    fontSize: 11,
-    color: 'var(--text-3)',
-    fontFamily: 'var(--font-mono)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-    marginBottom: 4,
-  },
-  scoreValue: {
-    fontFamily: 'var(--font-display)',
-    fontSize: 32,
-    fontWeight: 500,
-    lineHeight: 1,
-  },
-  scoreBars: {
-    display: 'flex',
-    alignItems: 'flex-end',
-    gap: 4,
-    height: 40,
-  },
-  bar: {
-    width: 8,
-    borderRadius: 3,
-    transition: 'height 0.3s ease',
-  },
-  row: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: 14,
-    padding: '12px 20px',
-  },
-  score: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 13,
-    fontWeight: 500,
-    width: 28,
-    flexShrink: 0,
-    paddingTop: 1,
-  },
-  detail: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 2,
-  },
-  reason: {
-    fontSize: 13,
-    fontWeight: 500,
-    color: 'var(--text)',
-  },
-  meta: {
-    fontSize: 11,
-    color: 'var(--text-3)',
-    fontFamily: 'var(--font-mono)',
-  },
+  scoreHeader: { padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  scoreLabel: { fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 },
+  scoreValue: { fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 500, lineHeight: 1 },
+  scoreBars: { display: 'flex', alignItems: 'flex-end', gap: 4, height: 40 },
+  bar: { width: 8, borderRadius: 3 },
+  row: { display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 20px' },
+  score: { fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, padding: '3px 8px', borderRadius: 4, display: 'inline-block', flexShrink: 0 },
+  detail: { flex: 1 },
+  reason: { fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 2 },
+  meta: { fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
 };

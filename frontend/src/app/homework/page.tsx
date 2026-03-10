@@ -1,16 +1,22 @@
+'use client';
+import { usePupil, useClassChartsData } from '@/lib/usePupil';
+import type { CCHomework } from '@classcharts/shared';
+
 export default function HomeworkPage() {
-  const homework = [
-    { id: 1, subject: 'Mathematics',  title: 'Quadratic equations worksheet',  description: 'Complete exercises 3.4–3.7 from the textbook. Show all working.', setDate: '10 Mar', dueDate: '11 Mar', status: 'todo',      daysLeft: 1 },
-    { id: 2, subject: 'English',      title: 'Essay — Of Mice and Men',        description: 'Write a 600-word analytical essay on the theme of loneliness.',   setDate: '9 Mar',  dueDate: '13 Mar', status: 'todo',      daysLeft: 3 },
-    { id: 3, subject: 'Science',      title: 'Lab report — photosynthesis',    description: 'Write up the experiment from Tuesday\'s lesson.',                 setDate: '8 Mar',  dueDate: '14 Mar', status: 'completed', daysLeft: 4 },
-    { id: 4, subject: 'French',       title: 'Vocabulary list — Chapter 6',    description: 'Learn 30 new vocabulary items. Quiz on Friday.',                  setDate: '7 Mar',  dueDate: '14 Mar', status: 'todo',      daysLeft: 4 },
-    { id: 5, subject: 'Geography',    title: 'Map skills worksheet',           description: 'Grid references and contour lines exercises.',                    setDate: '5 Mar',  dueDate: '7 Mar',  status: 'late',      daysLeft: -3 },
-  ];
+  const { activePupil } = usePupil();
+  const from = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+  const to = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+
+  const { data: homework, loading, error } = useClassChartsData<CCHomework[]>(
+    'homework',
+    { pupilId: String(activePupil?.id ?? ''), from, to },
+    [activePupil?.id],
+  );
 
   const grouped = {
-    overdue:   homework.filter(h => h.status === 'late'),
-    todo:      homework.filter(h => h.status === 'todo'),
-    completed: homework.filter(h => h.status === 'completed'),
+    late:      (homework ?? []).filter(h => h.status === 'late'),
+    todo:      (homework ?? []).filter(h => h.status === 'not_completed' && !h.ticked),
+    completed: (homework ?? []).filter(h => h.status === 'completed' || h.ticked),
   };
 
   return (
@@ -20,63 +26,89 @@ export default function HomeworkPage() {
         <div style={styles.legend}>
           <span style={{ ...styles.dot, background: 'var(--negative)' }} /> Overdue
           <span style={{ ...styles.dot, background: 'var(--warning)', marginLeft: 12 }} /> Due soon
-          <span style={{ ...styles.dot, background: 'var(--border)', marginLeft: 12 }} /> Upcoming
         </div>
       </div>
       <hr style={styles.rule} />
 
-      {grouped.overdue.length > 0 && (
-        <Group title="Overdue" items={grouped.overdue} />
+      {loading && <LoadingSkeleton />}
+      {error && <p style={{ color: 'var(--negative)', fontSize: 14 }}>{error}</p>}
+
+      {!loading && !error && (
+        <>
+          {grouped.late.length > 0 && <Group title="Overdue" items={grouped.late} />}
+          <Group title="To do" items={grouped.todo} emptyMessage="Nothing to do 🎉" />
+          <Group title="Completed" items={grouped.completed} muted />
+        </>
       )}
-      <Group title="To do" items={grouped.todo} />
-      <Group title="Completed" items={grouped.completed} muted />
     </div>
   );
 }
 
-function Group({ title, items, muted }: { title: string; items: any[]; muted?: boolean }) {
-  if (items.length === 0) return null;
+function Group({ title, items, muted, emptyMessage }: {
+  title: string; items: CCHomework[]; muted?: boolean; emptyMessage?: string;
+}) {
+  if (items.length === 0 && !emptyMessage) return null;
   return (
     <section style={{ marginBottom: 40, opacity: muted ? 0.6 : 1 }}>
-      <h2 style={styles.groupTitle}>{title} <span style={styles.groupCount}>{items.length}</span></h2>
-      <div className="card" style={{ overflow: 'hidden' }}>
-        {items.map((hw, i) => (
-          <div key={hw.id} style={{
-            ...styles.row,
-            borderBottom: i < items.length - 1 ? '1px solid var(--border)' : 'none',
-          }}>
-            <div style={{
-              ...styles.stripe,
-              background: hw.status === 'late'      ? 'var(--negative)' :
-                          hw.daysLeft <= 1           ? 'var(--negative)' :
-                          hw.daysLeft <= 3           ? 'var(--warning)'  : 'var(--border)',
-            }} />
-            <div style={styles.rowContent}>
-              <div style={styles.rowTop}>
-                <div>
-                  <span style={styles.subject}>{hw.subject}</span>
-                  <p style={styles.title}>{hw.title}</p>
-                  <p style={styles.description}>{hw.description}</p>
-                </div>
-                <div style={styles.dates}>
-                  <span style={styles.dateItem}>Set {hw.setDate}</span>
-                  <span style={{
-                    ...styles.dateItem,
-                    color: hw.status === 'late' ? 'var(--negative)' :
-                           hw.daysLeft <= 1      ? 'var(--negative)' :
-                           hw.daysLeft <= 3      ? 'var(--warning)'  : 'var(--text-3)',
-                    fontWeight: hw.daysLeft <= 3 ? 500 : 400,
-                  }}>
-                    Due {hw.dueDate}
-                  </span>
+      <h2 style={styles.groupTitle}>
+        {title} <span style={styles.groupCount}>{items.length}</span>
+      </h2>
+      {items.length === 0 ? (
+        <p style={{ fontSize: 13, color: 'var(--text-3)' }}>{emptyMessage}</p>
+      ) : (
+        <div className="card" style={{ overflow: 'hidden' }}>
+          {items.map((hw, i) => {
+            const daysLeft = Math.ceil((new Date(hw.dueDate).getTime() - Date.now()) / 86400000);
+            const urgency = hw.status === 'late' ? 'var(--negative)' :
+              daysLeft <= 1 ? 'var(--negative)' : daysLeft <= 3 ? 'var(--warning)' : 'var(--border)';
+
+            return (
+              <div key={hw.id} style={{ ...styles.row, borderBottom: i < items.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                <div style={{ ...styles.stripe, background: urgency }} />
+                <div style={styles.rowContent}>
+                  <div style={styles.rowTop}>
+                    <div style={{ flex: 1 }}>
+                      <span style={styles.subject}>{hw.subject}</span>
+                      <p style={styles.hwTitle}>{hw.title}</p>
+                      {hw.description && <p style={styles.description}>{hw.description}</p>}
+                      {hw.completionTime && <p style={styles.completionTime}>⏱ {hw.completionTime}</p>}
+                      {hw.links.length > 0 && hw.links.map((l, li) => (
+                        <a key={li} href={l.link} target="_blank" rel="noreferrer" style={styles.link}>🔗 Link</a>
+                      ))}
+                    </div>
+                    <div style={styles.dates}>
+                      <span style={styles.dateItem}>Set {formatDate(hw.issueDate)}</span>
+                      <span style={{
+                        ...styles.dateItem,
+                        color: urgency !== 'var(--border)' ? urgency : 'var(--text-3)',
+                        fontWeight: daysLeft <= 3 ? 500 : 400,
+                      }}>
+                        Due {formatDate(hw.dueDate)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        ))}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {[1, 2, 3].map(i => (
+        <div key={i} className="card" style={{ height: 72, background: 'var(--surface-2)' }} />
+      ))}
+    </div>
+  );
+}
+
+function formatDate(d: string) {
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -92,8 +124,10 @@ const styles: Record<string, React.CSSProperties> = {
   rowContent: { flex: 1, padding: '16px 20px' },
   rowTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 },
   subject: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4 },
-  title: { fontSize: 15, fontWeight: 500, marginBottom: 4 },
-  description: { fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5 },
+  hwTitle: { fontSize: 15, fontWeight: 500, marginBottom: 4 },
+  description: { fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5, marginBottom: 4 },
+  completionTime: { fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
+  link: { fontSize: 12, color: 'var(--info)', display: 'block', marginTop: 4 },
   dates: { display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'right', flexShrink: 0 },
   dateItem: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' },
 };
