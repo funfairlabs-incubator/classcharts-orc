@@ -20,6 +20,7 @@ cat > "$(dirname "$0")/../frontend/app.yaml" << YAML
 runtime: nodejs22
 instance_class: F1
 automatic_scaling:
+  max_instances: 2
   min_idle_instances: 0
   max_idle_instances: 1
 env_variables:
