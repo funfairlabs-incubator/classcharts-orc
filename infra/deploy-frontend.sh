@@ -3,7 +3,7 @@
 set -euo pipefail
 
 PROJECT_ID="${GCP_PROJECT_ID:-classcharts}"
-REGION="${GCP_REGION:-europe-west2}"
+REPO_ROOT="$(dirname "$0")/.."
 
 fetch_secret() {
   gcloud secrets versions access latest --secret="$1" --project="$PROJECT_ID" 2>/dev/null || echo ""
@@ -15,14 +15,36 @@ GOOGLE_CLIENT_SECRET=$(fetch_secret GOOGLE_CLIENT_SECRET)
 NEXTAUTH_SECRET=$(fetch_secret NEXTAUTH_SECRET)
 ADMIN_EMAIL=$(fetch_secret ADMIN_EMAIL)
 
+echo "▶ Building shared package..."
+cd "$REPO_ROOT/shared"
+npm install
+npm run build
+
+echo "▶ Copying shared into frontend for App Engine deploy..."
+rm -rf "$REPO_ROOT/frontend/vendor/shared"
+mkdir -p "$REPO_ROOT/frontend/vendor/shared"
+cp -r "$REPO_ROOT/shared/dist"         "$REPO_ROOT/frontend/vendor/shared/dist"
+cp    "$REPO_ROOT/shared/package.json"  "$REPO_ROOT/frontend/vendor/shared/package.json"
+# Copy shared node_modules too so classcharts-api is available
+cp -r "$REPO_ROOT/shared/node_modules" "$REPO_ROOT/frontend/vendor/shared/node_modules"
+
+echo "▶ Updating frontend package.json to point at vendored shared..."
+node -e "
+const fs = require('fs');
+const pkg = JSON.parse(fs.readFileSync('$REPO_ROOT/frontend/package.json'));
+pkg.dependencies['@classcharts/shared'] = 'file:./vendor/shared';
+pkg.scripts['gcp-build'] = 'next build';
+fs.writeFileSync('$REPO_ROOT/frontend/package.json', JSON.stringify(pkg, null, 2));
+"
+
 echo "▶ Writing app.yaml with secrets..."
-cat > "$(dirname "$0")/../frontend/app.yaml" << YAML
+cat > "$REPO_ROOT/frontend/app.yaml" << YAML
 runtime: nodejs22
 instance_class: F1
 automatic_scaling:
-  max_instances: 2
   min_idle_instances: 0
   max_idle_instances: 1
+  max_instances: 2
 env_variables:
   NODE_ENV: "production"
   GCP_PROJECT_ID: "${PROJECT_ID}"
@@ -38,7 +60,7 @@ beta_settings:
 YAML
 
 echo "▶ Deploying to App Engine..."
-cd "$(dirname "$0")/../frontend"
+cd "$REPO_ROOT/frontend"
 gcloud app deploy --quiet --project="$PROJECT_ID"
 
 echo "✅ Frontend deployed to https://${PROJECT_ID}.appspot.com"
