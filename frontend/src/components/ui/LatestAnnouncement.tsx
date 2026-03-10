@@ -1,112 +1,76 @@
-export async function LatestAnnouncement() {
-  // TODO: replace with real data + Claude summary
-  const announcement = {
-    id: 1,
-    title: 'Year 9 Geography Field Trip — Jurassic Coast',
-    teacherName: 'Mr. Thomson',
-    date: '10 March 2026',
-    summary: 'A day trip to the Jurassic Coast on 14 May. Cost is £45, consent form and payment due by 28 March.',
-    priority: 'high' as const,
-    hasDeadline: true,
-    deadline: '28 March 2026',
-    calendarAdded: true,
-  };
+'use client';
+import { usePupil, useClassChartsData } from '@/lib/usePupil';
+import type { CCAnnouncement } from '@classcharts/shared';
+
+export function LatestAnnouncement() {
+  const { activePupil } = usePupil();
+
+  const { data: announcements, loading, error } = useClassChartsData<CCAnnouncement[]>(
+    'announcements',
+    { pupilId: String(activePupil?.id ?? '') },
+    [activePupil?.id],
+  );
+
+  if (loading) return <Skeleton />;
+  if (error) return <div className="card" style={{ padding: 20, fontSize: 13, color: 'var(--negative)' }}>{error}</div>;
+
+  const latest = announcements?.[0];
+  if (!latest) return <div className="card" style={{ padding: 20, fontSize: 13, color: 'var(--text-3)', textAlign: 'center' }}>No announcements</div>;
+
+  const isPinned = latest.isPinned;
+  const requiresConsent = latest.requiresConsent;
+  const consentPending = requiresConsent && latest.consentGiven === null;
 
   return (
-    <div className="card" style={styles.card}>
+    <div className="card" style={{ padding: 20 }}>
       <div style={styles.header}>
-        <span className={`chip chip--${announcement.priority === 'high' ? 'warning' : 'neutral'}`}>
-          {announcement.priority === 'high' ? 'Action required' : 'Information'}
-        </span>
-        <span style={styles.date}>{announcement.date}</span>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {isPinned && <span className="chip chip--warning">Pinned</span>}
+          {consentPending && <span className="chip chip--warning">Consent required</span>}
+          {!isPinned && !consentPending && <span className="chip chip--neutral">Announcement</span>}
+        </div>
+        <span style={styles.date}>{formatDate(latest.timestamp)}</span>
       </div>
 
-      <h3 style={styles.title}>{announcement.title}</h3>
-      <p style={styles.teacher}>{announcement.teacherName}</p>
+      <h3 style={styles.title}>{latest.title}</h3>
+      <p style={styles.teacher}>{latest.teacherName} · {latest.schoolName}</p>
 
       <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '16px 0' }} />
 
-      {/* Claude summary */}
-      <div style={styles.summaryWrap}>
-        <span style={styles.summaryLabel}>Summary</span>
-        <p style={styles.summary}>{announcement.summary}</p>
-      </div>
+      {latest.descriptionText && (
+        <p style={styles.description}>
+          {latest.descriptionText.slice(0, 280)}
+          {latest.descriptionText.length > 280 ? '…' : ''}
+        </p>
+      )}
 
-      {announcement.hasDeadline && (
-        <div style={styles.deadlineRow}>
-          <span style={styles.deadlineIcon}>⚠</span>
-          <span style={styles.deadlineText}>Reply by {announcement.deadline}</span>
-          {announcement.calendarAdded && (
-            <span className="chip chip--info" style={{ fontSize: 10, marginLeft: 'auto' }}>
-              📅 In calendar
-            </span>
-          )}
+      {latest.attachments.length > 0 && (
+        <div style={styles.attachments}>
+          {latest.attachments.map((a, i) => (
+            <a key={i} href={a.url} target="_blank" rel="noreferrer" style={styles.attachmentLink}>
+              📎 {a.filename}
+            </a>
+          ))}
         </div>
       )}
     </div>
   );
 }
 
+function Skeleton() {
+  return <div className="card" style={{ padding: 20, height: 160, background: 'var(--surface-2)' }} />;
+}
+
+function formatDate(ts: string) {
+  return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 const styles: Record<string, React.CSSProperties> = {
-  card: {
-    padding: '20px',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  date: {
-    fontSize: 11,
-    fontFamily: 'var(--font-mono)',
-    color: 'var(--text-3)',
-  },
-  title: {
-    fontFamily: 'var(--font-display)',
-    fontSize: 17,
-    fontWeight: 500,
-    lineHeight: 1.3,
-    marginBottom: 4,
-  },
-  teacher: {
-    fontSize: 12,
-    color: 'var(--text-3)',
-    fontFamily: 'var(--font-mono)',
-  },
-  summaryWrap: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
-  },
-  summaryLabel: {
-    fontSize: 10,
-    fontFamily: 'var(--font-mono)',
-    color: 'var(--text-3)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.08em',
-  },
-  summary: {
-    fontSize: 13,
-    color: 'var(--text-2)',
-    lineHeight: 1.6,
-  },
-  deadlineRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 16,
-    padding: '10px 14px',
-    background: 'var(--warning-bg)',
-    borderRadius: 4,
-  },
-  deadlineIcon: {
-    fontSize: 13,
-    color: 'var(--warning)',
-  },
-  deadlineText: {
-    fontSize: 13,
-    fontWeight: 500,
-    color: 'var(--warning)',
-  },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  date: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' },
+  title: { fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 500, lineHeight: 1.3, marginBottom: 4 },
+  teacher: { fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
+  description: { fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 },
+  attachments: { marginTop: 12, display: 'flex', flexDirection: 'column', gap: 4 },
+  attachmentLink: { fontSize: 12, color: 'var(--info)', fontFamily: 'var(--font-mono)' },
 };
