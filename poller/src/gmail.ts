@@ -1,13 +1,11 @@
 import { google } from 'googleapis';
-import { Firestore } from '@google-cloud/firestore';
-import { sendPushover } from './pushover';
-
-const db = new Firestore({ projectId: process.env.GCP_PROJECT_ID });
+import { getGmailState, saveGmailState } from './state.js';
+import { sendPushover } from './pushover.js';
 
 function getGmailClient() {
   const auth = new google.auth.OAuth2(
     process.env.GMAIL_CLIENT_ID,
-    process.env.GMAIL_CLIENT_SECRET
+    process.env.GMAIL_CLIENT_SECRET,
   );
   auth.setCredentials({ refresh_token: process.env.GMAIL_REFRESH_TOKEN });
   return google.gmail({ version: 'v1', auth });
@@ -15,47 +13,55 @@ function getGmailClient() {
 
 export async function watchGmail(): Promise<void> {
   const gmail = getGmailClient();
-
-  // Get last processed email ID from Firestore
-  const stateDoc = await db.collection('poll_state').doc('gmail').get();
-  const lastEmailId: string = stateDoc.exists ? stateDoc.data()?.lastEmailId ?? '' : '';
+  const { lastEmailId } = await getGmailState();
 
   const res = await gmail.users.messages.list({
     userId: 'me',
     q: 'from:noreply@classcharts.com is:unread',
-    maxResults: 10,
+    maxResults: 20,
   });
 
   const messages = res.data.messages ?? [];
+  if (messages.length === 0) return;
+
+  // Filter to only messages newer than last processed
   const newMessages = lastEmailId
     ? messages.filter(m => m.id! > lastEmailId)
     : messages;
 
+  if (newMessages.length === 0) return;
+
   for (const msg of newMessages) {
-    const full = await gmail.users.messages.get({ userId: 'me', id: msg.id! });
+    const full = await gmail.users.messages.get({
+      userId: 'me',
+      id: msg.id!,
+      format: 'metadata',
+      metadataHeaders: ['Subject', 'From'],
+    });
+
     const headers = full.data.payload?.headers ?? [];
     const subject = headers.find(h => h.name === 'Subject')?.value ?? 'ClassCharts notification';
 
-    // Mark as read
+    // Mark as read — we handle it now
     await gmail.users.messages.modify({
       userId: 'me',
       id: msg.id!,
       requestBody: { removeLabelIds: ['UNREAD'] },
     });
 
-    // Only send Pushover if it's not something we already caught via API polling
-    // (announcements and comms that don't appear in the API)
-    if (!subject.toLowerCase().includes('new activity')) {
-      await sendPushover('📧 ClassCharts Email', subject, 0);
+    // Only push emails that aren't already covered by the API poll
+    // (e.g. two-way messages, letters, things not in the API)
+    const isActivityEmail = /new (behaviour|homework|award|attendance)/i.test(subject);
+    if (!isActivityEmail) {
+      await sendPushover({
+        title: '📧 ClassCharts',
+        message: subject,
+        priority: 0,
+      });
     }
   }
 
-  if (newMessages.length > 0) {
-    const latestId = newMessages[0].id!;
-    await db.collection('poll_state').doc('gmail').set({
-      lastEmailId: latestId,
-      updatedAt: new Date().toISOString(),
-    });
-    console.log(`Gmail: processed ${newMessages.length} new messages`);
-  }
+  // Save the latest message ID
+  await saveGmailState(newMessages[0].id!);
+  console.log(`Gmail: processed ${newMessages.length} new message(s)`);
 }

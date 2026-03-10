@@ -1,113 +1,170 @@
-import { ClassChartsClient } from '@classcharts/shared';
-import type { PollState, NotificationEvent } from '@classcharts/shared';
-import { Firestore } from '@google-cloud/firestore';
-import { sendPushover } from './pushover';
-import { formatNotification } from './formatter';
-
-const db = new Firestore({ projectId: process.env.GCP_PROJECT_ID });
-
-interface ParentConfig {
-  email: string;
-  code: string;
-}
-
-function getParentConfigs(): ParentConfig[] {
-  const configs: ParentConfig[] = [];
-  if (process.env.CLASSCHARTS_PARENT1_EMAIL && process.env.CLASSCHARTS_PARENT1_CODE) {
-    configs.push({
-      email: process.env.CLASSCHARTS_PARENT1_EMAIL,
-      code: process.env.CLASSCHARTS_PARENT1_CODE,
-    });
-  }
-  if (process.env.CLASSCHARTS_PARENT2_EMAIL && process.env.CLASSCHARTS_PARENT2_CODE) {
-    configs.push({
-      email: process.env.CLASSCHARTS_PARENT2_EMAIL,
-      code: process.env.CLASSCHARTS_PARENT2_CODE,
-    });
-  }
-  return configs;
-}
-
-async function getState(studentId: number): Promise<PollState | null> {
-  const doc = await db.collection('poll_state').doc(String(studentId)).get();
-  return doc.exists ? (doc.data() as PollState) : null;
-}
-
-async function saveState(state: PollState): Promise<void> {
-  await db.collection('poll_state').doc(String(state.studentId)).set(state);
-}
+import { loginAllParents, todayStr, daysAgoStr } from '@classcharts/shared';
+import type { CCStudent } from '@classcharts/shared';
+import { getState, saveState } from './state.js';
+import { sendPushover } from './pushover.js';
+import { formatHomework, formatActivity, formatAnnouncement, formatAttendance, formatDetention } from './formatter.js';
+import { analyseAnnouncement, summariseHomework, summariseActivity } from './claude.js';
+import { ensureCalendarsExist, createCalendarEvents } from './calendar.js';
 
 export async function pollClassCharts(): Promise<void> {
-  const parents = getParentConfigs();
-  const today = new Date().toISOString().split('T')[0];
-  const twoWeeksAgo = new Date(Date.now() - 14 * 86400000).toISOString().split('T')[0];
+  const from = daysAgoStr(30);
+  const today = todayStr();
 
-  for (const parent of parents) {
-    const client = new ClassChartsClient(parent.email, parent.code);
-    const students = await client.login();
+  const parents = await loginAllParents();
+  console.log(`Logged in ${parents.length} parent(s), found ${parents.reduce((n, p) => n + p.pupils.length, 0)} unique pupil(s)`);
 
-    for (const student of students) {
-      const state = await getState(student.id) ?? {
-        studentId: student.id,
-        lastHomeworkId: 0,
-        lastBehaviourId: 0,
-        lastAnnouncementId: 0,
-        lastAttendanceDate: '',
-        lastEmailId: '',
-        updatedAt: new Date().toISOString(),
-      };
+  // Ensure Google Calendars exist for all pupils
+  const allStudents: CCStudent[] = parents.flatMap(p => p.pupils);
+  let calendarConfig;
+  try {
+    calendarConfig = await ensureCalendarsExist(
+      allStudents.map(s => ({ id: s.id, name: s.name })),
+    );
+  } catch (err) {
+    console.warn('Calendar setup failed (non-fatal):', err);
+  }
 
-      const events: NotificationEvent[] = [];
+  for (const { client, pupils } of parents) {
+    for (const pupil of pupils) {
+      client.selectPupil(pupil.id);
+      const state = await getState(pupil.id);
+      let changed = false;
 
-      // ── Homework ────────────────────────────────────────────
-      const homeworks = await client.getHomework(student.id, twoWeeksAgo, today);
-      const newHomeworks = homeworks.filter(h => h.id > state.lastHomeworkId);
-      for (const hw of newHomeworks) {
-        events.push({ type: 'homework', data: hw });
-      }
-      if (newHomeworks.length > 0) {
-        state.lastHomeworkId = Math.max(...newHomeworks.map(h => h.id));
-      }
+      console.log(`Polling ${pupil.name} (${pupil.id})...`);
 
-      // ── Behaviour ───────────────────────────────────────────
-      const behaviours = await client.getBehaviour(student.id, twoWeeksAgo, today);
-      const newBehaviours = behaviours.filter(b => b.id > state.lastBehaviourId);
-      for (const beh of newBehaviours) {
-        events.push({ type: 'behaviour', data: beh });
-      }
-      if (newBehaviours.length > 0) {
-        state.lastBehaviourId = Math.max(...newBehaviours.map(b => b.id));
-      }
+      // ── Activity (behaviour/notices) ─────────────────────────
+      if (pupil.displayBehaviour) {
+        try {
+          const activity = await client.getActivity(from, today);
+          const newPoints = activity.filter(a => a.id > state.lastActivityId);
 
-      // ── Announcements ────────────────────────────────────────
-      const announcements = await client.getAnnouncements(student.id);
-      const newAnnouncements = announcements.filter(a => a.id > state.lastAnnouncementId);
-      for (const ann of newAnnouncements) {
-        events.push({ type: 'announcement', data: ann });
-      }
-      if (newAnnouncements.length > 0) {
-        state.lastAnnouncementId = Math.max(...newAnnouncements.map(a => a.id));
-      }
+          for (const point of newPoints) {
+            const summary = await summariseActivity(point, pupil.name);
+            const msg = formatActivity(point, pupil.name, summary);
+            await sendPushover(msg);
+          }
 
-      // ── Attendance ───────────────────────────────────────────
-      const attendances = await client.getAttendance(student.id, today, today);
-      for (const att of attendances) {
-        if (att.date > state.lastAttendanceDate) {
-          events.push({ type: 'attendance', data: att });
-          state.lastAttendanceDate = att.date;
+          if (newPoints.length > 0) {
+            state.lastActivityId = Math.max(...newPoints.map(a => a.id));
+            changed = true;
+            console.log(`  ${pupil.name}: ${newPoints.length} new activity point(s)`);
+          }
+        } catch (err) {
+          console.error(`  Activity poll failed for ${pupil.name}:`, err);
         }
       }
 
-      // ── Send notifications ───────────────────────────────────
-      for (const event of events) {
-        const { title, message, priority } = formatNotification(student.name, event);
-        await sendPushover(title, message, priority);
+      // ── Homework ─────────────────────────────────────────────
+      if (pupil.displayHomework) {
+        try {
+          const homeworks = await client.getHomeworks(from, daysAgoStr(-14)); // -14 = 14 days ahead
+          const newHomeworks = homeworks.filter(h => h.id > state.lastHomeworkId);
+
+          for (const hw of newHomeworks) {
+            const summary = await summariseHomework(hw);
+            const msg = formatHomework(hw, pupil.name, summary);
+            await sendPushover(msg);
+          }
+
+          if (newHomeworks.length > 0) {
+            state.lastHomeworkId = Math.max(...newHomeworks.map(h => h.id));
+            changed = true;
+            console.log(`  ${pupil.name}: ${newHomeworks.length} new homework(s)`);
+          }
+        } catch (err) {
+          console.error(`  Homework poll failed for ${pupil.name}:`, err);
+        }
       }
 
-      state.updatedAt = new Date().toISOString();
-      await saveState(state);
+      // ── Announcements ────────────────────────────────────────
+      if (pupil.displayAnnouncements) {
+        try {
+          const announcements = await client.getAnnouncements();
+          const newAnnouncements = announcements.filter(a => a.id > state.lastAnnouncementId);
 
-      console.log(`Polled ${student.name}: ${events.length} new events`);
+          for (const ann of newAnnouncements) {
+            const analysis = await analyseAnnouncement(ann, pupil.id, pupil.name);
+
+            let calendarAdded = false;
+            if (analysis.calendarEvents.length > 0 && calendarConfig) {
+              try {
+                await createCalendarEvents(analysis.calendarEvents, calendarConfig);
+                calendarAdded = true;
+                console.log(`  Created ${analysis.calendarEvents.length} calendar event(s) for announcement: ${ann.title}`);
+              } catch (err) {
+                console.error('  Calendar event creation failed:', err);
+              }
+            }
+
+            const msg = formatAnnouncement(
+              ann, pupil.name, analysis.summary,
+              analysis.requiresAction, analysis.actionDescription,
+              calendarAdded,
+            );
+            await sendPushover(msg);
+          }
+
+          if (newAnnouncements.length > 0) {
+            state.lastAnnouncementId = Math.max(...newAnnouncements.map(a => a.id));
+            changed = true;
+            console.log(`  ${pupil.name}: ${newAnnouncements.length} new announcement(s)`);
+          }
+        } catch (err) {
+          console.error(`  Announcements poll failed for ${pupil.name}:`, err);
+        }
+      }
+
+      // ── Attendance ───────────────────────────────────────────
+      if (pupil.displayAttendance) {
+        try {
+          const attendance = await client.getAttendance(today, today);
+          const newDays = attendance.days.filter(d => d.date > state.lastAttendanceDate);
+
+          for (const day of newDays) {
+            const msg = formatAttendance(day, pupil.name);
+            if (msg) await sendPushover(msg); // only notify if absences/lates
+          }
+
+          if (newDays.length > 0) {
+            state.lastAttendanceDate = newDays[newDays.length - 1].date;
+            changed = true;
+          }
+        } catch (err) {
+          console.error(`  Attendance poll failed for ${pupil.name}:`, err);
+        }
+      }
+
+      // ── Detentions ───────────────────────────────────────────
+      if (pupil.displayDetentions) {
+        try {
+          const detentions = await client.getDetentions();
+          // Detentions don't have a reliable sequential ID in our state,
+          // use a composite key approach — store known IDs in state
+          const knownIds: number[] = (state as any).knownDetentionIds ?? [];
+          const newDetentions = detentions.filter(d => !knownIds.includes(d.id));
+
+          for (const det of newDetentions) {
+            const msg = formatDetention(det, pupil.name);
+            await sendPushover(msg);
+          }
+
+          if (newDetentions.length > 0) {
+            (state as any).knownDetentionIds = [
+              ...knownIds,
+              ...newDetentions.map(d => d.id),
+            ].slice(-50); // keep last 50 to avoid unbounded growth
+            changed = true;
+            console.log(`  ${pupil.name}: ${newDetentions.length} new detention(s)`);
+          }
+        } catch (err) {
+          console.error(`  Detentions poll failed for ${pupil.name}:`, err);
+        }
+      }
+
+      if (changed) {
+        state.updatedAt = new Date().toISOString();
+        await saveState(state);
+      }
     }
   }
 }
