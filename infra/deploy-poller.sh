@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 
 gcloud builds submit \
   --tag "$IMAGE" \
-  --file Dockerfile.poller \
+  --dockerfile Dockerfile.poller \
   .
 
 echo "▶ Deploying to Cloud Run..."
