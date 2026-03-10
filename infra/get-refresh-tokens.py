@@ -32,7 +32,7 @@ client_config = {
         "client_secret": CLIENT_SECRET,
         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
         "token_uri": "https://oauth2.googleapis.com/token",
-        "redirect_uris": ["http://localhost:8080"],
+        "redirect_uris": ["http://localhost:8888"],
     }
 }
 
@@ -41,7 +41,7 @@ print("If it doesn't open automatically, check the terminal for a URL.\n")
 
 flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
 creds = flow.run_local_server(
-    port=8080,
+    port=8888,
     prompt="consent",
     access_type="offline",
     open_browser=True,
