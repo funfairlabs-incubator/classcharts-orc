@@ -1,85 +1,172 @@
-// ── ClassCharts data types ────────────────────────────────────
+// ── Our normalised domain types ───────────────────────────────
 
 export interface CCStudent {
   id: number;
   name: string;
-  school: string;
-  avatarUrl?: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string;
+  schoolName: string;
+  displayBehaviour: boolean;
+  displayHomework: boolean;
+  displayAttendance: boolean;
+  displayTimetable: boolean;
+  displayAnnouncements: boolean;
+  displayDetentions: boolean;
+  homeworkTodoCount: number;
+  homeworkLateCount: number;
+  announcementsCount: number;
+  detentionPendingCount: number;
 }
 
-export interface CCBehaviourPoint {
+export interface CCActivityPoint {
   id: number;
-  studentId: number;
-  timestamp: string;
-  score: number; // positive or negative
+  type: 'behaviour' | 'detention' | 'attendance_event' | 'notice' | 'event' | 'other';
+  polarity: 'positive' | 'negative' | 'neutral';
   reason: string;
-  lessonName?: string;
-  teacherName?: string;
+  score: number;
+  timestamp: string;
+  lessonName: string | null;
+  teacherName: string | null;
+  roomName: string | null;
+  note: string | null;
+}
+
+export interface CCBehaviourSummary {
+  timeline: Array<{
+    positive: number;
+    negative: number;
+    label: string;
+    start: string;
+    end: string;
+  }>;
+  positiveReasons: Record<string, number>;
+  negativeReasons: Record<string, number>;
+  startDate: string;
+  endDate: string;
 }
 
 export interface CCHomework {
   id: number;
-  studentId: number;
   title: string;
   description: string;
   subject: string;
-  setDate: string;
-  dueDate: string;
-  status: 'todo' | 'completed' | 'late';
-  attachmentUrl?: string;
-}
-
-export interface CCAttendance {
-  studentId: number;
-  date: string;
-  amStatus: string;
-  pmStatus: string;
-  lessons: CCLessonAttendance[];
-}
-
-export interface CCLessonAttendance {
-  period: string;
-  subject: string;
-  status: string;
-}
-
-export interface CCTimetableLesson {
-  studentId: number;
-  date: string;
-  period: string;
-  subject: string;
+  lesson: string;
   teacher: string;
-  room: string;
+  issueDate: string;
+  dueDate: string;
+  status: 'completed' | 'late' | 'not_completed' | null;
+  ticked: boolean;
+  hasAttachments: boolean;
+  attachments: Array<{ fileName: string; url: string }>;
+  links: Array<{ link: string }>;
+  completionTime: string;
+}
+
+export interface CCLesson {
+  teacherName: string;
+  lessonName: string;
+  subjectName: string;
+  periodName: string;
+  periodNumber: string;
+  roomName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  isBreak: boolean;
+  isAlternative: boolean;
+  pupilNote: string;
+}
+
+export interface CCAttendanceSession {
+  code: string;
+  status: 'present' | 'absent' | 'late' | 'excused' | 'ignore' | 'unknown';
+  lateMinutes: number;
+  lessonName?: string;
+}
+
+export interface CCAttendanceDay {
+  date: string;
+  sessions: Record<string, CCAttendanceSession>;
+}
+
+export interface CCAttendanceSummary {
+  days: CCAttendanceDay[];
+  overallPercentage: string;
+  startDate: string;
+  endDate: string;
 }
 
 export interface CCAnnouncement {
   id: number;
   title: string;
-  description: string;
+  descriptionHtml: string | null;
+  descriptionText: string | null;
+  schoolName: string;
   teacherName: string;
   timestamp: string;
-  priority: 'normal' | 'high';
+  isPinned: boolean;
+  requiresConsent: boolean;
+  consentGiven: boolean | null;
+  attachments: Array<{ filename: string; url: string }>;
 }
 
-// ── Poll state (stored in Firestore) ─────────────────────────
+export interface CCDetention {
+  id: number;
+  attended: 'yes' | 'no' | 'upscaled' | 'pending';
+  date: string | null;
+  time: string | null;
+  length: number | null;
+  location: string | null;
+  reason: string;
+  lessonName: string | null;
+  teacherName: string | null;
+  detentionType: string | null;
+}
+
+export interface CCBadge {
+  id: number;
+  name: string;
+  iconUrl: string;
+  colour: string;
+  createdDate: string;
+}
+
+// ── Poll state (Firestore) ────────────────────────────────────
 
 export interface PollState {
   studentId: number;
+  lastActivityId: number;
   lastHomeworkId: number;
-  lastBehaviourId: number;
   lastAnnouncementId: number;
   lastAttendanceDate: string;
   lastEmailId: string;
   updatedAt: string;
 }
 
+// ── Calendar event ────────────────────────────────────────────
+
+export interface CalendarEvent {
+  title: string;
+  date: string;
+  endDate?: string;
+  allDay: boolean;
+  description: string;
+  deadlineDate?: string;
+  eventType: 'homework' | 'trip' | 'parents_evening' | 'options_day' | 'term_date' | 'announcement' | 'deadline' | 'other';
+  sourceAnnouncementId?: number;
+  studentId: number;
+  calendarId?: string;
+}
+
 // ── Notification events ───────────────────────────────────────
 
 export type NotificationEvent =
-  | { type: 'homework'; data: CCHomework }
-  | { type: 'behaviour'; data: CCBehaviourPoint }
-  | { type: 'attendance'; data: CCAttendance }
-  | { type: 'announcement'; data: CCAnnouncement };
+  | { type: 'activity';     data: CCActivityPoint;   studentName: string }
+  | { type: 'homework';     data: CCHomework;         studentName: string }
+  | { type: 'announcement'; data: CCAnnouncement;    studentName: string }
+  | { type: 'attendance';   data: CCAttendanceDay;   studentName: string }
+  | { type: 'detention';    data: CCDetention;       studentName: string };
 
 // ── Auth ──────────────────────────────────────────────────────
 
