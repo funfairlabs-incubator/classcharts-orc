@@ -3,7 +3,7 @@
 set -euo pipefail
 
 PROJECT_ID="${GCP_PROJECT_ID:-classcharts}"
-REPO_ROOT="$(dirname "$0")/.."
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 fetch_secret() {
   gcloud secrets versions access latest --secret="$1" --project="$PROJECT_ID" 2>/dev/null || echo ""
