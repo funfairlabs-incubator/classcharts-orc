@@ -75,3 +75,20 @@ echo "  1. Deploy poller: cd .. && gcloud run deploy classcharts-poller --source
 echo "  2. Create Pub/Sub push subscription pointing to your Cloud Run URL"
 echo "  3. Deploy frontend: cd frontend && gcloud app deploy"
 echo "  4. Set env vars/secrets via Secret Manager"
+
+# ── 3pm Homework Digest Scheduler ─────────────────────────────
+echo "▶ Creating 3pm homework digest scheduler job..."
+gcloud scheduler jobs create pubsub classcharts-digest \
+  --location="$REGION" \
+  --schedule="0 15 * * 1-5" \
+  --topic=classcharts-poll \
+  --message-body='{"trigger":"digest"}' \
+  --time-zone="Europe/London" \
+  --description="Sends homework digest at 3pm weekdays" \
+  2>/dev/null || gcloud scheduler jobs update pubsub classcharts-digest \
+  --location="$REGION" \
+  --schedule="0 15 * * 1-5" \
+  --topic=classcharts-poll \
+  --message-body='{"trigger":"digest"}' \
+  --time-zone="Europe/London" \
+  2>/dev/null || echo "Digest scheduler job already up to date"

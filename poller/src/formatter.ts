@@ -135,3 +135,26 @@ export function formatHomeworkOverdue(
     priority: 1,
   };
 }
+
+// ── Homework Status Change ─────────────────────────────────────
+
+export function formatHomeworkStatusChange(
+  hw: CCHomework,
+  studentName: string,
+  prevStatus: string,
+  newStatus: string,
+): PushoverMessage {
+  const statusLabel: Record<string, string> = {
+    completed: 'completed ✓',
+    ticked: 'ticked off ✓',
+    late: 'marked late ⚠',
+    not_completed: 'not completed',
+    pending: 'pending',
+  };
+  const label = statusLabel[newStatus] ?? newStatus;
+  return {
+    title: `📝 Homework ${label} — ${studentName}`,
+    message: `${hw.subject}: ${hw.title}\nDue: ${formatDate(hw.dueDate)}`,
+    priority: newStatus === 'late' ? 1 : 0,
+  };
+}
