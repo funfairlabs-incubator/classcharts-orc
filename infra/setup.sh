@@ -110,3 +110,17 @@ gcloud firestore indexes composite create \
   --field-config=field-path=date,order=ascending \
   --project="$PROJECT_ID" \
   2>/dev/null || echo "  upcoming_events index already exists"
+
+# ── Firestore Indexes ─────────────────────────────────────────
+echo "▶ Deploying Firestore indexes..."
+gcloud firestore indexes composite create \
+  --collection-group=announcements \
+  --field-config=field-path=studentId,order=ascending \
+  --field-config=field-path=timestamp,order=descending \
+  --project="$PROJECT_ID" --quiet 2>/dev/null || echo "  announcements index already exists"
+
+gcloud firestore indexes composite create \
+  --collection-group=attachments \
+  --field-config=field-path=studentId,order=ascending \
+  --field-config=field-path=announcementDate,order=descending \
+  --project="$PROJECT_ID" --quiet 2>/dev/null || echo "  attachments index already exists"

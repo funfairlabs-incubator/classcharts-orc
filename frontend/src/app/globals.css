@@ -1,33 +1,32 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --bg: #fafaf8;
+  --bg: #f4f4f4;
   --surface: #ffffff;
-  --surface-2: #f5f4f0;
-  --border: #e8e6df;
-  --border-strong: #d0cdc4;
-  --text: #1a1917;
-  --text-2: #6b6860;
-  --text-3: #9c9a94;
-  --accent: #1a1917;
-  --positive: #2d6a4f;
-  --positive-bg: #f0faf5;
-  --negative: #9b2335;
-  --negative-bg: #fdf2f4;
+  --surface-2: #ebebeb;
+  --border: #d4d4d4;
+  --border-strong: #b0b0b0;
+  --text: #111111;
+  --text-2: #444444;
+  --text-3: #777777;
+  --accent: #111111;
+  --positive: #166534;
+  --positive-bg: #dcfce7;
+  --negative: #991b1b;
+  --negative-bg: #fee2e2;
   --warning: #92400e;
-  --warning-bg: #fffbeb;
-  --info: #1e3a5f;
-  --info-bg: #eff6ff;
-  --font-display: 'Playfair Display', Georgia, serif;
-  --font-body: 'DM Sans', sans-serif;
-  --font-mono: 'DM Mono', monospace;
-  --radius: 4px;
-  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  --warning-bg: #fef3c7;
+  --info: #1e40af;
+  --info-bg: #dbeafe;
+  --font-display: 'Inter', Arial, sans-serif;
+  --font-body: 'Inter', Arial, sans-serif;
+  --font-mono: 'Inter', Arial, monospace;
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.05);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 html { font-size: 16px; -webkit-font-smoothing: antialiased; }
 
 body {
@@ -40,34 +39,23 @@ body {
 
 h1, h2, h3 {
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.2;
-  letter-spacing: -0.01em;
 }
 
 a { color: inherit; text-decoration: none; }
 
-/* Ruled line utility */
-.rule {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 0;
-}
+.rule { border: none; border-top: 1px solid var(--border); margin: 0; }
+.rule--strong { border-top-color: var(--border-strong); }
 
-.rule--strong {
-  border-top-color: var(--border-strong);
-}
-
-/* Chip / badge */
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 100px;
   font-size: 11px;
-  font-weight: 500;
-  font-family: var(--font-mono);
+  font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
@@ -78,7 +66,6 @@ a { color: inherit; text-decoration: none; }
 .chip--info     { background: var(--info-bg);      color: var(--info);     }
 .chip--neutral  { background: var(--surface-2);    color: var(--text-2);   }
 
-/* Card */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -86,16 +73,12 @@ a { color: inherit; text-decoration: none; }
   box-shadow: var(--shadow);
 }
 
-/* Fade-in animation */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.fade-up {
-  animation: fadeUp 0.3s ease forwards;
-}
-
+.fade-up { animation: fadeUp 0.3s ease forwards; }
 .fade-up-1 { animation-delay: 0.05s; opacity: 0; }
 .fade-up-2 { animation-delay: 0.1s;  opacity: 0; }
 .fade-up-3 { animation-delay: 0.15s; opacity: 0; }
