@@ -6,6 +6,7 @@ import { formatHomework, formatHomeworkOverdue, formatHomeworkStatusChange, form
 import { analyseAnnouncement, summariseHomework, summariseActivity } from './claude.js';
 import { ensureCalendarsExist, createCalendarEvents } from './calendar.js';
 import { getEnabledKeys } from './prefs.js';
+import { archiveAnnouncement } from './archive.js';
 
 export async function pollClassCharts(): Promise<void> {
   const from = daysAgoStr(30);
@@ -119,6 +120,7 @@ export async function pollClassCharts(): Promise<void> {
             const keys = await getEnabledKeys('announcements');
             for (const ann of newAnnouncements) {
               const analysis = await analyseAnnouncement(ann, pupil.id, pupil.name);
+              await archiveAnnouncement(ann, pupil.id, analysis);
               let calendarAdded = false;
               if (analysis.calendarEvents.length > 0 && calendarConfig) {
                 try { await createCalendarEvents(analysis.calendarEvents, calendarConfig); calendarAdded = true; }

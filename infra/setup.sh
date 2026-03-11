@@ -92,3 +92,21 @@ gcloud scheduler jobs create pubsub classcharts-digest \
   --message-body='{"trigger":"digest"}' \
   --time-zone="Europe/London" \
   2>/dev/null || echo "Digest scheduler job already up to date"
+
+# ── Firestore indexes ──────────────────────────────────────────
+echo "▶ Creating Firestore composite indexes..."
+# announcements: studentId + timestamp
+gcloud firestore indexes composite create \
+  --collection-group=announcements \
+  --field-config=field-path=studentId,order=ascending \
+  --field-config=field-path=timestamp,order=descending \
+  --project="$PROJECT_ID" \
+  2>/dev/null || echo "  announcements index already exists"
+
+# upcoming_events: studentId + date
+gcloud firestore indexes composite create \
+  --collection-group=upcoming_events \
+  --field-config=field-path=studentId,order=ascending \
+  --field-config=field-path=date,order=ascending \
+  --project="$PROJECT_ID" \
+  2>/dev/null || echo "  upcoming_events index already exists"

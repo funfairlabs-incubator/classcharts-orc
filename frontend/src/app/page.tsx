@@ -1,6 +1,6 @@
 'use client';
 import { usePupil, useClassChartsData } from '@/lib/usePupil';
-import type { CCStudent, CCLesson, CCActivityPoint, CCHomework, CCAttendanceSummary, CCAnnouncement } from '@classcharts/shared';
+import type { CCStudent, CCLesson, CCActivityPoint, CCHomework, CCAttendanceSummary, CCAnnouncement, UpcomingEvent, ArchivedAnnouncement } from '@classcharts/shared';
 import Link from 'next/link';
 import { TimetableTimeline } from '@/components/TimetableTimeline';
 
@@ -56,7 +56,8 @@ function StudentCard({ pupil, accent }: { pupil: CCStudent; accent: typeof STUDE
   const { data: behaviour } = useClassChartsData<{ activity: CCActivityPoint[] }>('behaviour', { pupilId: String(pupil.id), from: weekAgo, to: today }, [pupil.id]);
   const { data: homeworkData } = useClassChartsData<CCHomework[]>('homework', { pupilId: String(pupil.id), from: today, to: monthAhead }, [pupil.id]);
   const { data: attendance } = useClassChartsData<CCAttendanceSummary>('attendance', { pupilId: String(pupil.id), from: monthAgo, to: today }, [pupil.id]);
-  const { data: announcements } = useClassChartsData<CCAnnouncement[]>('announcements', { pupilId: String(pupil.id) }, [pupil.id]);
+  const { data: announcements } = useClassChartsData<(CCAnnouncement | ArchivedAnnouncement)[]>('announcements', { pupilId: String(pupil.id) }, [pupil.id]);
+  const { data: upcomingEvents } = useClassChartsData<UpcomingEvent[]>('events', { pupilId: String(pupil.id) }, [pupil.id]);
 
   // Derived stats
   const now = new Date();
@@ -66,6 +67,8 @@ function StudentCard({ pupil, accent }: { pupil: CCStudent; accent: typeof STUDE
   const todoHw = (homeworkData ?? []).filter(h => h.status !== 'completed' && !h.ticked && new Date(h.dueDate) >= now);
   const attendPct = attendance ? parseFloat(attendance.overallPercentage) : null;
   const latestAnn = (announcements ?? [])[0] ?? null;
+  const consentPending = (announcements ?? []).filter(a => a.requiresConsent && a.consentGiven === null);
+  const nextEvents = (upcomingEvents ?? []).slice(0, 3);
 
   const attendColor = attendPct === null ? '#9ca3af'
     : attendPct >= 95 ? '#16a34a'
@@ -77,7 +80,8 @@ function StudentCard({ pupil, accent }: { pupil: CCStudent; accent: typeof STUDE
     overdueHw.length > 0 && { text: `${overdueHw.length} overdue`, href: `/homework?pupil=${pupil.id}`, urgent: true },
     pupil.detentionPendingCount > 0 && { text: `${pupil.detentionPendingCount} detention${pupil.detentionPendingCount > 1 ? 's' : ''}`, href: `/detentions?pupil=${pupil.id}`, urgent: true },
     pupil.announcementsCount > 0 && { text: `${pupil.announcementsCount} unread`, href: `/announcements?pupil=${pupil.id}`, urgent: false },
-  ].filter(Boolean) as { text: string; href: string; urgent: boolean }[];
+    consentPending.length > 0 && { text: `${consentPending.length} consent needed`, href: `https://app.classcharts.com`, urgent: true, external: true },
+  ].filter(Boolean) as { text: string; href: string; urgent: boolean; external?: boolean }[];
 
   return (
     <div className="card" style={{ ...styles.card, '--accent': accent.color, '--accent-bg': accent.bg, '--accent-border': accent.border } as any}>
@@ -108,7 +112,7 @@ function StudentCard({ pupil, accent }: { pupil: CCStudent; accent: typeof STUDE
       {flags.length > 0 && (
         <div style={styles.flagRow}>
           {flags.map((f, i) => (
-            <Link key={i} href={f.href} style={{
+            <Link key={i} href={f.href} target={f.external ? '_blank' : undefined} rel={f.external ? 'noreferrer' : undefined} style={{
               ...styles.flag,
               background: f.urgent ? '#fef2f2' : accent.bg,
               color: f.urgent ? '#b91c1c' : accent.color,
@@ -133,6 +137,29 @@ function StudentCard({ pupil, accent }: { pupil: CCStudent; accent: typeof STUDE
           accent={accent}
         />
       </div>
+
+      {nextEvents.length > 0 && (
+        <>
+          <hr style={styles.rule} />
+          <div style={styles.section}>
+            <div style={styles.sectionHead}>
+              <span style={{ ...styles.sectionTitle, color: accent.color }}>Coming Up</span>
+              <Link href={`/announcements?pupil=${pupil.id}`} style={{ ...styles.sectionLink, color: accent.color }}>All →</Link>
+            </div>
+            <div style={styles.eventList}>
+              {nextEvents.map((ev, i) => (
+                <div key={i} style={styles.eventRow}>
+                  <div style={{ ...styles.eventTypeDot, background: eventTypeColor(ev.eventType) }} />
+                  <div style={styles.eventMeta}>
+                    <span style={styles.eventTitle}>{ev.title}</span>
+                    <span style={styles.eventDate}>{formatEventDate(ev.date)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       <hr style={styles.rule} />
 
@@ -195,6 +222,29 @@ function StatCell({ label, href, accent, children }: { label: string; href: stri
       {children}
     </Link>
   );
+}
+
+
+function formatEventDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const today = new Date();
+  const diffDays = Math.ceil((date.getTime() - today.setHours(0,0,0,0)) / 86400000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Tomorrow';
+  if (diffDays <= 7) return date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+function eventTypeColor(type: string): string {
+  const map: Record<string, string> = {
+    parents_evening: '#7c3aed',
+    options_day: '#b45309',
+    trip: '#0369a1',
+    homework: '#15803d',
+    term_date: '#374151',
+    deadline: '#dc2626',
+  };
+  return map[type] ?? '#6b7280';
 }
 
 function LoadingState() {
@@ -268,4 +318,10 @@ const styles: Record<string, React.CSSProperties> = {
   statSub: { fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
   annPreview: { fontSize: 12, fontWeight: 500, textAlign: 'center', lineHeight: 1.3, maxWidth: 120, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' },
   empty: { fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
+  eventList: { display: 'flex', flexDirection: 'column', gap: 8 },
+  eventRow: { display: 'flex', alignItems: 'flex-start', gap: 10 },
+  eventTypeDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 4 },
+  eventMeta: { display: 'flex', flexDirection: 'column', gap: 1 },
+  eventTitle: { fontSize: 13, fontWeight: 500 },
+  eventDate: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' },
 };
