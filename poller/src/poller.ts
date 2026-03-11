@@ -1,10 +1,11 @@
 import { loginAllParents, todayStr, daysAgoStr } from '@classcharts/shared';
-import type { CCStudent, CCHomework } from '@classcharts/shared';
+import type { CCStudent } from '@classcharts/shared';
 import { getState, saveState } from './state.js';
-import { sendPushover } from './pushover.js';
-import { formatHomework, formatHomeworkOverdue, formatActivity, formatAnnouncement, formatAttendance, formatDetention } from './formatter.js';
+import { sendPushoverToKeys } from './pushover.js';
+import { formatHomework, formatHomeworkOverdue, formatHomeworkStatusChange, formatActivity, formatAnnouncement, formatAttendance, formatDetention } from './formatter.js';
 import { analyseAnnouncement, summariseHomework, summariseActivity } from './claude.js';
 import { ensureCalendarsExist, createCalendarEvents } from './calendar.js';
+import { getEnabledKeys } from './prefs.js';
 
 export async function pollClassCharts(): Promise<void> {
   const from = daysAgoStr(30);
@@ -17,9 +18,7 @@ export async function pollClassCharts(): Promise<void> {
   const allStudents: CCStudent[] = parents.flatMap(p => p.pupils);
   let calendarConfig;
   try {
-    calendarConfig = await ensureCalendarsExist(
-      allStudents.map(s => ({ id: s.id, name: s.name })),
-    );
+    calendarConfig = await ensureCalendarsExist(allStudents.map(s => ({ id: s.id, name: s.name })));
   } catch (err) {
     console.warn('Calendar setup failed (non-fatal):', err);
   }
@@ -29,29 +28,23 @@ export async function pollClassCharts(): Promise<void> {
       client.selectPupil(pupil.id);
       const state = await getState(pupil.id);
       let changed = false;
-
       console.log(`Polling ${pupil.name} (${pupil.id})...`);
 
-      // ── Activity (behaviour/notices) ─────────────────────────
+      // ── Activity (behaviour) ─────────────────────────────────
       if (pupil.displayBehaviour) {
         try {
           const activity = await client.getActivity(from, today);
           const newPoints = activity.filter(a => a.id > state.lastActivityId);
-
-          for (const point of newPoints) {
-            const summary = await summariseActivity(point, pupil.name);
-            const msg = formatActivity(point, pupil.name, summary);
-            await sendPushover(msg);
-          }
-
           if (newPoints.length > 0) {
+            const keys = await getEnabledKeys('behaviour');
+            for (const point of newPoints) {
+              const summary = await summariseActivity(point, pupil.name);
+              await sendPushoverToKeys(keys, formatActivity(point, pupil.name, summary));
+            }
             state.lastActivityId = Math.max(...newPoints.map(a => a.id));
             changed = true;
-            console.log(`  ${pupil.name}: ${newPoints.length} new activity point(s)`);
           }
-        } catch (err) {
-          console.error(`  Activity poll failed for ${pupil.name}:`, err);
-        }
+        } catch (err) { console.error(`  Activity poll failed for ${pupil.name}:`, err); }
       }
 
       // ── Homework ─────────────────────────────────────────────
@@ -59,43 +52,62 @@ export async function pollClassCharts(): Promise<void> {
         try {
           const homeworks = await client.getHomeworks(from, aheadTo);
 
-          // New homework set
+          // New homework
           const newHomeworks = homeworks.filter(h => h.id > state.lastHomeworkId);
-          for (const hw of newHomeworks) {
-            const summary = await summariseHomework(hw);
-            const msg = formatHomework(hw, pupil.name, summary);
-            await sendPushover(msg);
-          }
-
           if (newHomeworks.length > 0) {
+            const keys = await getEnabledKeys('homeworkNew');
+            for (const hw of newHomeworks) {
+              const summary = await summariseHomework(hw);
+              await sendPushoverToKeys(keys, formatHomework(hw, pupil.name, summary));
+            }
             state.lastHomeworkId = Math.max(...newHomeworks.map(h => h.id));
             changed = true;
-            console.log(`  ${pupil.name}: ${newHomeworks.length} new homework(s)`);
           }
 
-          // Overdue homework — alert once per homework ID
+          // Overdue
           const knownOverdueIds: number[] = (state as any).knownOverdueIds ?? [];
-          const overdueItems = homeworks.filter(h => {
-            const due = new Date(h.dueDate);
-            const isOverdue = due < new Date() && h.status !== 'completed' && !h.ticked;
-            return isOverdue && !knownOverdueIds.includes(h.id);
-          });
-
-          for (const hw of overdueItems) {
-            await sendPushover(formatHomeworkOverdue(hw, pupil.name));
-          }
-
+          const overdueItems = homeworks.filter(h =>
+            new Date(h.dueDate) < new Date() &&
+            h.status !== 'completed' && !h.ticked &&
+            !knownOverdueIds.includes(h.id)
+          );
           if (overdueItems.length > 0) {
-            (state as any).knownOverdueIds = [
-              ...knownOverdueIds,
-              ...overdueItems.map(h => h.id),
-            ].slice(-100);
+            const keys = await getEnabledKeys('homeworkNew'); // overdue uses same toggle
+            for (const hw of overdueItems) {
+              await sendPushoverToKeys(keys, formatHomeworkOverdue(hw, pupil.name));
+            }
+            (state as any).knownOverdueIds = [...knownOverdueIds, ...overdueItems.map(h => h.id)].slice(-100);
             changed = true;
-            console.log(`  ${pupil.name}: ${overdueItems.length} newly overdue homework(s)`);
           }
-        } catch (err) {
-          console.error(`  Homework poll failed for ${pupil.name}:`, err);
-        }
+
+          // Status changes (submitted / completed)
+          const knownStatuses: Record<number, string> = (state as any).homeworkStatuses ?? {};
+          const statusChanges = homeworks.filter(h => {
+            const prev = knownStatuses[h.id];
+            const curr = h.status ?? (h.ticked ? 'ticked' : 'pending');
+            return prev !== undefined && prev !== curr;
+          });
+          if (statusChanges.length > 0) {
+            const keys = await getEnabledKeys('homeworkStatusChange');
+            for (const hw of statusChanges) {
+              const prev = knownStatuses[hw.id];
+              const curr = hw.status ?? (hw.ticked ? 'ticked' : 'pending');
+              await sendPushoverToKeys(keys, formatHomeworkStatusChange(hw, pupil.name, prev, curr));
+            }
+            changed = true;
+          }
+          // Record current statuses for all homework
+          for (const hw of homeworks) {
+            knownStatuses[hw.id] = hw.status ?? (hw.ticked ? 'ticked' : 'pending');
+          }
+          // Prune old entries (keep last 200)
+          const sortedKeys = Object.keys(knownStatuses).map(Number).sort((a, b) => b - a).slice(0, 200);
+          const pruned: Record<number, string> = {};
+          for (const k of sortedKeys) pruned[k] = knownStatuses[k];
+          (state as any).homeworkStatuses = pruned;
+          changed = true;
+
+        } catch (err) { console.error(`  Homework poll failed for ${pupil.name}:`, err); }
       }
 
       // ── Announcements ────────────────────────────────────────
@@ -103,46 +115,29 @@ export async function pollClassCharts(): Promise<void> {
         try {
           const announcements = await client.getAnnouncements();
           const newAnnouncements = announcements.filter(a => a.id > state.lastAnnouncementId);
-
-          for (const ann of newAnnouncements) {
-            const analysis = await analyseAnnouncement(ann, pupil.id, pupil.name);
-
-            let calendarAdded = false;
-            if (analysis.calendarEvents.length > 0 && calendarConfig) {
-              try {
-                await createCalendarEvents(analysis.calendarEvents, calendarConfig);
-                calendarAdded = true;
-              } catch (err) {
-                console.error('  Calendar event creation failed:', err);
-              }
-            }
-
-            const msg = formatAnnouncement(
-              ann, pupil.name, analysis.summary,
-              analysis.requiresAction, analysis.actionDescription,
-              calendarAdded,
-            );
-            await sendPushover(msg);
-          }
-
           if (newAnnouncements.length > 0) {
+            const keys = await getEnabledKeys('announcements');
+            for (const ann of newAnnouncements) {
+              const analysis = await analyseAnnouncement(ann, pupil.id, pupil.name);
+              let calendarAdded = false;
+              if (analysis.calendarEvents.length > 0 && calendarConfig) {
+                try { await createCalendarEvents(analysis.calendarEvents, calendarConfig); calendarAdded = true; }
+                catch (err) { console.error('  Calendar event creation failed:', err); }
+              }
+              await sendPushoverToKeys(keys, formatAnnouncement(ann, pupil.name, analysis.summary, analysis.requiresAction, analysis.actionDescription, calendarAdded));
+            }
             state.lastAnnouncementId = Math.max(...newAnnouncements.map(a => a.id));
             changed = true;
-            console.log(`  ${pupil.name}: ${newAnnouncements.length} new announcement(s)`);
           }
-        } catch (err) {
-          console.error(`  Announcements poll failed for ${pupil.name}:`, err);
-        }
+        } catch (err) { console.error(`  Announcements poll failed for ${pupil.name}:`, err); }
       }
 
       // ── Attendance ───────────────────────────────────────────
       if (pupil.displayAttendance) {
         try {
           const attendance = await client.getAttendance(today, today);
-          // Use composite key: date+session to avoid re-alerting
           const knownAttendanceKeys: string[] = (state as any).knownAttendanceKeys ?? [];
           const newAlerts: string[] = [];
-
           for (const day of attendance.days) {
             for (const [session, info] of Object.entries(day.sessions)) {
               const key = `${day.date}:${session}:${info.status}`;
@@ -151,24 +146,19 @@ export async function pollClassCharts(): Promise<void> {
               }
             }
           }
-
           if (newAlerts.length > 0) {
+            const keys = await getEnabledKeys('attendance');
             const newDays = attendance.days.filter(d =>
-              Object.entries(d.sessions).some(([sess, info]) =>
-                newAlerts.includes(`${d.date}:${sess}:${info.status}`)
-              )
+              Object.entries(d.sessions).some(([sess, info]) => newAlerts.includes(`${d.date}:${sess}:${info.status}`))
             );
             for (const day of newDays) {
               const msg = formatAttendance(day, pupil.name);
-              if (msg) await sendPushover(msg);
+              if (msg) await sendPushoverToKeys(keys, msg);
             }
             (state as any).knownAttendanceKeys = [...knownAttendanceKeys, ...newAlerts].slice(-200);
             changed = true;
-            console.log(`  ${pupil.name}: ${newAlerts.length} new attendance alert(s)`);
           }
-        } catch (err) {
-          console.error(`  Attendance poll failed for ${pupil.name}:`, err);
-        }
+        } catch (err) { console.error(`  Attendance poll failed for ${pupil.name}:`, err); }
       }
 
       // ── Detentions ───────────────────────────────────────────
@@ -177,26 +167,16 @@ export async function pollClassCharts(): Promise<void> {
           const detentions = await client.getDetentions();
           const knownIds: number[] = (state as any).knownDetentionIds ?? [];
           const newDetentions = detentions.filter(d => !knownIds.includes(d.id));
-
-          for (const det of newDetentions) {
-            const msg = formatDetention(det, pupil.name);
-            await sendPushover(msg);
-          }
-
           if (newDetentions.length > 0) {
+            const keys = await getEnabledKeys('detentions');
+            for (const det of newDetentions) await sendPushoverToKeys(keys, formatDetention(det, pupil.name));
             (state as any).knownDetentionIds = [...knownIds, ...newDetentions.map(d => d.id)].slice(-50);
             changed = true;
-            console.log(`  ${pupil.name}: ${newDetentions.length} new detention(s)`);
           }
-        } catch (err) {
-          console.error(`  Detentions poll failed for ${pupil.name}:`, err);
-        }
+        } catch (err) { console.error(`  Detentions poll failed for ${pupil.name}:`, err); }
       }
 
-      if (changed) {
-        state.updatedAt = new Date().toISOString();
-        await saveState(state);
-      }
+      if (changed) { state.updatedAt = new Date().toISOString(); await saveState(state); }
     }
   }
 }

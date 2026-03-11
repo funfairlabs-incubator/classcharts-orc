@@ -36,6 +36,7 @@ const NAV = [
   { href: '/behaviour',     label: 'Behaviour',  icon: '★' },
   { href: '/attendance',    label: 'Attendance', icon: '✓' },
   { href: '/announcements', label: 'News',       icon: '◉' },
+  { href: '/settings',     label: 'Settings',   icon: '⚙' },
 ];
 
 function AppShellInner({ children, session }: { children: React.ReactNode; session: any }) {

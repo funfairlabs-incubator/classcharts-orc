@@ -1,34 +1,33 @@
 import express from 'express';
 import { pollClassCharts } from './poller.js';
-import { watchGmail } from './gmail.js';
+import { sendHomeworkDigest } from './digest.js';
 
 const app = express();
 app.use(express.json());
 
-// Pub/Sub push endpoint — Cloud Scheduler publishes here every N mins
-app.post('/', async (_req, res) => {
-  const start = Date.now();
-  console.log(`[${new Date().toISOString()}] Poll triggered`);
+app.post('/', async (req, res) => {
+  res.status(200).send('OK'); // ack immediately
 
   try {
-    await Promise.allSettled([
-      pollClassCharts(),
-      watchGmail(),
-    ]);
-    console.log(`Poll complete in ${Date.now() - start}ms`);
-    res.status(204).send();
+    // Decode Pub/Sub message
+    const body = req.body?.message?.data
+      ? JSON.parse(Buffer.from(req.body.message.data, 'base64').toString())
+      : req.body ?? {};
+
+    const trigger = body?.trigger ?? 'scheduled';
+    console.log(`Received trigger: ${trigger}`);
+
+    if (trigger === 'digest') {
+      await sendHomeworkDigest();
+    } else {
+      await pollClassCharts();
+    }
   } catch (err) {
-    console.error('Unhandled poll error:', err);
-    // Return 200 to avoid Pub/Sub retry storm — errors are logged
-    res.status(200).json({ error: String(err) });
+    console.error('Poll error:', err);
   }
 });
 
-app.get('/health', (_req, res) => res.json({
-  ok: true,
-  version: process.env.K_REVISION ?? 'local',
-  ts: new Date().toISOString(),
-}));
+app.get('/health', (_req, res) => res.json({ ok: true }));
 
 const PORT = process.env.PORT ?? 8080;
 app.listen(PORT, () => console.log(`Poller listening on :${PORT}`));

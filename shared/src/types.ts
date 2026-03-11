@@ -180,3 +180,23 @@ export interface AllowedUser {
 export interface AllowedUsersConfig {
   users: AllowedUser[];
 }
+
+// ── User notification preferences (GCS) ──────────────────────
+
+export interface UserNotificationPrefs {
+  email: string;
+  pushoverKey?: string;           // their personal Pushover user key
+  notifications: {
+    homeworkDigest: boolean;      // 3pm daily digest of upcoming homework
+    homeworkStatusChange: boolean;// when homework marked submitted
+    homeworkNew: boolean;         // when new homework is set
+    behaviour: boolean;           // behaviour points (+ and -)
+    detentions: boolean;          // new detentions
+    attendance: boolean;          // absences / lates
+    announcements: boolean;       // school announcements
+  };
+}
+
+export interface UserPrefsConfig {
+  prefs: UserNotificationPrefs[];
+}
