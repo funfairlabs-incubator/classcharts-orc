@@ -1,0 +1,20 @@
+{
+  "name": "classcharts-scripts",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "backfill-calendar": "ts-node backfill-calendar.ts",
+    "backfill-calendar:dry": "ts-node backfill-calendar.ts --dry-run"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.0.0",
+    "@google-cloud/storage": "^7.0.0",
+    "dotenv": "^16.0.0",
+    "googleapis": "^144.0.0"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
+  }
+}
