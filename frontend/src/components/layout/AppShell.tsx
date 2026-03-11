@@ -37,6 +37,7 @@ const NAV = [
   { href: '/attendance',    label: 'Attendance', icon: '✓' },
   { href: '/announcements', label: 'News',       icon: '◉' },
   { href: '/documents',     label: 'Documents',  icon: '📎' },
+  { href: '/architecture',  label: 'How it works', icon: '🔧' },
   { href: '/settings',      label: 'Settings',   icon: '⚙' },
 ];
 
@@ -47,7 +48,13 @@ function AppShellInner({ children, session }: { children: React.ReactNode; sessi
     <div style={styles.root}>
       {/* Top bar — minimal */}
       <header style={styles.topBar}>
-        <span style={styles.wordmark}>ClassCharts</span>
+        <span style={styles.wordmark}>
+          <span style={{ color: '#f97316', fontWeight: 800 }}>FunFairLabs</span>
+          <span style={{ color: 'var(--text-3)', fontSize: 11, fontWeight: 400 }}>+</span>
+          <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>Claude</span>
+          <span style={{ color: 'var(--border-strong)', fontSize: 11 }}>|</span>
+          <span style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 500 }}>ClassCharts</span>
+        </span>
         <div style={styles.topRight}>
           {(session.user as any)?.isAdmin && (
             <Link href="/admin" style={styles.adminLink}>Admin</Link>
@@ -80,7 +87,7 @@ function AppShellInner({ children, session }: { children: React.ReactNode; sessi
 const styles: Record<string, React.CSSProperties> = {
   root: { minHeight: '100vh', display: 'flex', flexDirection: 'column', paddingBottom: 72 },
   topBar: { position: 'sticky', top: 0, zIndex: 100, background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  wordmark: { fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 500, letterSpacing: '-0.01em' },
+  wordmark: { fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 6 },
   topRight: { display: 'flex', alignItems: 'center', gap: 12 },
   adminLink: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', padding: '3px 8px', border: '1px solid var(--border)', borderRadius: 4 },
   userDot: { width: 28, height: 28, borderRadius: '50%', background: 'var(--text)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-mono)', cursor: 'default' },
