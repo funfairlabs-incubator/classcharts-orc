@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@classcharts/shared": "file:../shared",
+    "@google-cloud/firestore": "^7.10.0",
     "@google-cloud/storage": "^7.11.0",
     "next": "^14.2.0",
     "next-auth": "^4.24.0",
