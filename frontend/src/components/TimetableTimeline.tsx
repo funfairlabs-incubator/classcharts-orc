@@ -19,13 +19,20 @@ interface Props {
   accent: { color: string; bg: string; border: string };
 }
 
+function extractTime(t: string): string {
+  // Handles "09:00", "2026-03-11T09:00:00", "2026-03-11 09:00:00"
+  if (!t) return '00:00';
+  const match = t.match(/(\d{2}:\d{2})/);
+  return match ? match[1] : '00:00';
+}
+
 function timeMins(t: string) {
-  const [h, m] = (t || '00:00').split(':').map(Number);
+  const [h, m] = extractTime(t).split(':').map(Number);
   return h * 60 + m;
 }
 
 function fmtTime(t: string) {
-  return t.slice(0, 5);
+  return extractTime(t);
 }
 
 function guessBreakLabel(periodName: string, startTime: string): string {
@@ -210,50 +217,50 @@ export function TimetableTimeline({ lessons, href, accent }: Props) {
 const styles: Record<string, React.CSSProperties> = {
   nowBanner: {
     display: 'flex', alignItems: 'center', gap: 8,
-    padding: '8px 12px', borderRadius: 6, border: '1px solid',
+    padding: '10px 12px', borderRadius: 6, border: '1px solid',
     marginBottom: 12,
   },
-  nowDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0 },
-  nowLabel: { fontSize: 13, fontWeight: 600 },
-  nowSub: { fontSize: 12, color: 'var(--text-2)' },
+  nowDot: { width: 9, height: 9, borderRadius: '50%', flexShrink: 0 },
+  nowLabel: { fontSize: 14, fontWeight: 600, color: 'var(--text)' },
+  nowSub: { fontSize: 13, color: 'var(--text-2)', fontWeight: 500 },
 
   timelineWrap: { marginBottom: 14 },
-  timelineTrack: { position: 'relative', height: 20, marginBottom: 4 },
+  timelineTrack: { position: 'relative', height: 22, marginBottom: 6 },
   timeLabels: { display: 'flex', justifyContent: 'space-between' },
-  timeLabel: { fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' },
+  timeLabel: { fontSize: 11, fontWeight: 500, color: 'var(--text-2)' },
 
   nowArrow: {
-    position: 'absolute', top: -6, transform: 'translateX(-50%)',
+    position: 'absolute', top: -7, transform: 'translateX(-50%)',
     display: 'flex', flexDirection: 'column', alignItems: 'center',
     pointerEvents: 'none', zIndex: 10,
   },
   arrowHead: {
     width: 0, height: 0,
-    borderLeft: '5px solid transparent',
-    borderRight: '5px solid transparent',
-    borderBottom: '7px solid',
+    borderLeft: '6px solid transparent',
+    borderRight: '6px solid transparent',
+    borderBottom: '8px solid',
   },
-  arrowLine: { width: 2, height: 26, marginTop: -1 },
+  arrowLine: { width: 2, height: 28, marginTop: -1 },
 
   lessonList: { display: 'flex', flexDirection: 'column', gap: 1, marginBottom: 10 },
   lessonRow: {
     display: 'flex', alignItems: 'flex-start', gap: 10,
-    padding: '6px 8px', transition: 'opacity 0.2s', position: 'relative',
+    padding: '8px 8px', transition: 'opacity 0.2s', position: 'relative',
   },
   nowPill: {
-    position: 'absolute', right: 8, top: 6,
-    color: '#fff', fontSize: 9, fontFamily: 'var(--font-mono)',
-    fontWeight: 700, padding: '2px 6px', borderRadius: 100,
-    textTransform: 'uppercase', letterSpacing: '0.06em',
+    position: 'absolute', right: 8, top: 8,
+    color: '#fff', fontSize: 10,
+    fontWeight: 700, padding: '2px 8px', borderRadius: 100,
+    textTransform: 'uppercase', letterSpacing: '0.04em',
   },
-  lessonTime: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', width: 36, flexShrink: 0, paddingTop: 1 },
-  lessonMeta: { flex: 1, display: 'flex', flexDirection: 'column', gap: 1 },
-  lessonSubject: { fontSize: 13, fontWeight: 500 },
-  lessonDetail: { fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
+  lessonTime: { fontSize: 12, fontWeight: 600, color: 'var(--text-2)', width: 40, flexShrink: 0, paddingTop: 1 },
+  lessonMeta: { flex: 1, display: 'flex', flexDirection: 'column', gap: 2 },
+  lessonSubject: { fontSize: 14, fontWeight: 500, color: 'var(--text)' },
+  lessonDetail: { fontSize: 12, color: 'var(--text-2)', fontWeight: 400 },
   breakRow: {
     display: 'flex', alignItems: 'center', gap: 8,
-    padding: '4px 8px 4px 11px',
+    padding: '5px 8px 5px 11px',
   },
-  breakLabel: { fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontStyle: 'italic' },
-  breakTime: { fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
+  breakLabel: { fontSize: 12, color: 'var(--text-2)', fontWeight: 500, fontStyle: 'italic' },
+  breakTime: { fontSize: 11, color: 'var(--text-2)', fontWeight: 400 },
 };

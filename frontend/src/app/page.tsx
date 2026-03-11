@@ -272,7 +272,7 @@ const styles: Record<string, React.CSSProperties> = {
   page: { maxWidth: 1100, margin: '0 auto', padding: '24px 16px 48px' },
   pageHeader: { marginBottom: 28 },
   dateStr: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 },
-  pageTitle: { fontSize: 32, fontFamily: 'var(--font-display)', fontWeight: 500 },
+  pageTitle: { fontSize: 28, fontWeight: 700 },
 
   // Grid: stacked on mobile, side by side on tablet+
   grid: {
@@ -286,22 +286,22 @@ const styles: Record<string, React.CSSProperties> = {
   stripe: { height: 4 },
   cardHead: { display: 'flex', alignItems: 'center', gap: 14, padding: '18px 20px 14px' },
   avatar: { width: 40, height: 40, borderRadius: '50%', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', flexShrink: 0, letterSpacing: '0.05em' },
-  studentName: { fontSize: 17, fontFamily: 'var(--font-display)', fontWeight: 500, lineHeight: 1.2, marginBottom: 2 },
-  schoolName: { fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  studentName: { fontSize: 18, fontWeight: 700, lineHeight: 1.2, marginBottom: 2 },
+  schoolName: { fontSize: 11, color: 'var(--text-2)', fontWeight: 500 },
 
-  trafficWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, textDecoration: 'none' },
-  trafficDot: { width: 12, height: 12, borderRadius: '50%' },
-  trafficPct: { fontSize: 14, fontWeight: 700, fontFamily: 'var(--font-mono)', lineHeight: 1 },
-  trafficLabel: { fontSize: 9, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  trafficWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, textDecoration: 'none', background: 'var(--surface-2)', borderRadius: 8, padding: '8px 12px', border: '1px solid var(--border)' },
+  trafficDot: { width: 10, height: 10, borderRadius: '50%' },
+  trafficPct: { fontSize: 16, fontWeight: 700, lineHeight: 1 },
+  trafficLabel: { fontSize: 10, color: 'var(--text-2)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' },
 
   flagRow: { display: 'flex', gap: 6, flexWrap: 'wrap', padding: '0 20px 14px' },
-  flag: { fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600, padding: '4px 10px', borderRadius: 100, border: '1px solid', textDecoration: 'none' },
+  flag: { fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 100, border: '1px solid', textDecoration: 'none' },
 
   rule: { border: 'none', borderTop: '1px solid var(--border)', margin: '0 20px' },
 
   section: { padding: '14px 20px' },
   sectionHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  sectionTitle: { fontSize: 10, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 },
+  sectionTitle: { fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 },
   sectionLink: { fontSize: 11, fontFamily: 'var(--font-mono)', textDecoration: 'none' },
 
   lessonGrid: { display: 'flex', flexDirection: 'column', gap: 2 },
@@ -314,8 +314,8 @@ const styles: Record<string, React.CSSProperties> = {
 
   statsRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', borderTop: '1px solid var(--border)' },
   statCell: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '14px 8px 16px', gap: 2, textDecoration: 'none', borderRight: '1px solid var(--border)', cursor: 'pointer' },
-  statLabel: { fontSize: 9, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 },
-  statSub: { fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
+  statLabel: { fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600, marginBottom: 4 },
+  statSub: { fontSize: 11, color: 'var(--text-2)', fontWeight: 500 },
   annPreview: { fontSize: 12, fontWeight: 500, textAlign: 'center', lineHeight: 1.3, maxWidth: 120, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' },
   empty: { fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
   eventList: { display: 'flex', flexDirection: 'column', gap: 8 },
