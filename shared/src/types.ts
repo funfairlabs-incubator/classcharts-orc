@@ -200,3 +200,28 @@ export interface UserNotificationPrefs {
 export interface UserPrefsConfig {
   prefs: UserNotificationPrefs[];
 }
+
+// ── Archived announcement (Firestore) ─────────────────────────
+
+export interface ArchivedAnnouncement extends CCAnnouncement {
+  studentId: number;
+  archivedAt: string;
+  attachmentGcsPaths: Record<string, string>; // filename -> GCS path
+  calendarEvents: CalendarEvent[];
+  aiSummary: string;
+  requiresAction: boolean;
+  actionDescription: string | null;
+}
+
+// ── Upcoming event (Firestore) ────────────────────────────────
+
+export interface UpcomingEvent {
+  id: string;           // composite key: studentId_announcementId_eventIndex
+  studentId: number;
+  title: string;
+  date: string;         // ISO date
+  endDate?: string;
+  eventType: CalendarEvent['eventType'];
+  sourceAnnouncementId?: number;
+  description: string;
+}

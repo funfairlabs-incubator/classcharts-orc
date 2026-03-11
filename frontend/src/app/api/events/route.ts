@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getClientFor } from '@/lib/classcharts';
 import { Firestore } from '@google-cloud/firestore';
 
 const db = new Firestore({ projectId: process.env.GCP_PROJECT_ID });
@@ -14,24 +13,20 @@ export async function GET(req: NextRequest) {
   const pupilId = parseInt(searchParams.get('pupilId') ?? '0');
   if (!pupilId) return NextResponse.json({ error: 'pupilId required' }, { status: 400 });
 
+  const from = new Date().toISOString().split('T')[0];
+  const to = new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0];
+
   try {
-    // Try archive first (richer data, permanent)
-    const snapshot = await db.collection('announcements')
+    const snapshot = await db.collection('upcoming_events')
       .where('studentId', '==', pupilId)
-      .orderBy('timestamp', 'desc')
-      .limit(100)
+      .where('date', '>=', from)
+      .where('date', '<=', to)
+      .orderBy('date', 'asc')
+      .limit(10)
       .get();
-
-    if (!snapshot.empty) {
-      return NextResponse.json(snapshot.docs.map(d => d.data()));
-    }
-
-    // Fall back to live ClassCharts if archive not populated yet
-    const client = await getClientFor(pupilId);
-    const announcements = await client.getAnnouncements();
-    return NextResponse.json(announcements);
+    return NextResponse.json(snapshot.docs.map(d => d.data()));
   } catch (err) {
-    console.error('GET /api/announcements failed:', err);
+    console.error('GET /api/events failed:', err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
