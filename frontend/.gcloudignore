@@ -2,6 +2,8 @@
 .git
 .gitignore
 node_modules/
+vendor/shared/node_modules/
+vendor/shared/src/
 .next/
 *.log
 .env
