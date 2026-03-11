@@ -33,7 +33,7 @@ node -e "
 const fs = require('fs');
 const pkg = JSON.parse(fs.readFileSync('$REPO_ROOT/frontend/package.json'));
 pkg.dependencies['@classcharts/shared'] = 'file:./vendor/shared';
-pkg.scripts['gcp-build'] = 'next build';
+pkg.scripts['gcp-build'] = 'cd vendor/shared && npm install --production && cd ../.. && next build';
 fs.writeFileSync('$REPO_ROOT/frontend/package.json', JSON.stringify(pkg, null, 2));
 "
 
