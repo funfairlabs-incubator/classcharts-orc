@@ -2,6 +2,7 @@
 import { usePupil, useClassChartsData } from '@/lib/usePupil';
 import type { CCStudent, CCLesson, CCActivityPoint, CCHomework, CCAttendanceSummary, CCAnnouncement } from '@classcharts/shared';
 import Link from 'next/link';
+import { TimetableTimeline } from '@/components/TimetableTimeline';
 
 // One accent colour per student slot — warm, distinct, accessible
 const STUDENT_ACCENTS = [
@@ -60,7 +61,6 @@ function StudentCard({ pupil, accent }: { pupil: CCStudent; accent: typeof STUDE
   // Derived stats
   const now = new Date();
   const nowMins = now.getHours() * 60 + now.getMinutes();
-  const todayLessons = (lessons ?? []).filter(l => !l.isBreak);
   const behavScore = (behaviour?.activity ?? []).reduce((s, p) => s + p.score, 0);
   const overdueHw = (homeworkData ?? []).filter(h => new Date(h.dueDate) < now && h.status !== 'completed' && !h.ticked);
   const todoHw = (homeworkData ?? []).filter(h => h.status !== 'completed' && !h.ticked && new Date(h.dueDate) >= now);
@@ -123,40 +123,16 @@ function StudentCard({ pupil, accent }: { pupil: CCStudent; accent: typeof STUDE
       <hr style={styles.rule} />
 
       {/* ① Timetable */}
-      <Section
-        title="Today's Timetable"
-        href={`/timetable?pupil=${pupil.id}`}
-        accent={accent}
-      >
-        {todayLessons.length === 0
-          ? <p style={styles.empty}>No lessons today</p>
-          : (
-            <div style={styles.lessonGrid}>
-              {todayLessons.map((l, i) => {
-                const startM = timeMins(l.startTime);
-                const endM = timeMins(l.endTime);
-                const isCurrent = nowMins >= startM && nowMins < endM;
-                const isPast = nowMins >= endM;
-                return (
-                  <div key={i} style={{
-                    ...styles.lesson,
-                    opacity: isPast ? 0.4 : 1,
-                    background: isCurrent ? accent.bg : 'transparent',
-                    borderLeft: isCurrent ? `3px solid ${accent.color}` : '3px solid transparent',
-                  }}>
-                    <span style={styles.lessonTime}>{l.startTime.slice(0, 5)}</span>
-                    <div style={styles.lessonMeta}>
-                      <span style={styles.lessonSubject}>{l.subjectName}</span>
-                      {l.teacherName && <span style={styles.lessonTeacher}>{l.teacherName}{l.roomName ? ` · ${l.roomName}` : ''}</span>}
-                    </div>
-                    {isCurrent && <span style={{ ...styles.nowBadge, background: accent.color }}>Now</span>}
-                  </div>
-                );
-              })}
-            </div>
-          )
-        }
-      </Section>
+      <div style={styles.section}>
+        <div style={styles.sectionHead}>
+          <span style={{ ...styles.sectionTitle, color: accent.color }}>Today's Timetable</span>
+        </div>
+        <TimetableTimeline
+          lessons={lessons ?? []}
+          href={`/timetable?pupil=${pupil.id}`}
+          accent={accent}
+        />
+      </div>
 
       <hr style={styles.rule} />
 
