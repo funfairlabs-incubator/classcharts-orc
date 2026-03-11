@@ -1,17 +1,8 @@
 'use client';
-import { useSession, signIn, signOut } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { PupilProvider, usePupil } from '@/lib/usePupil';
-
-const NAV = [
-  { href: '/',              label: 'Overview'      },
-  { href: '/timetable',     label: 'Timetable'     },
-  { href: '/homework',      label: 'Homework'      },
-  { href: '/behaviour',     label: 'Behaviour'     },
-  { href: '/attendance',    label: 'Attendance'    },
-  { href: '/announcements', label: 'Announcements' },
-];
+import { PupilProvider } from '@/lib/usePupil';
 
 export function AppShell({ children, session }: { children: React.ReactNode; session: any }) {
   const { data: clientSession } = useSession();
@@ -38,90 +29,67 @@ export function AppShell({ children, session }: { children: React.ReactNode; ses
   );
 }
 
+const NAV = [
+  { href: '/',              label: 'Home',       icon: '⌂' },
+  { href: '/timetable',     label: 'Timetable',  icon: '◷' },
+  { href: '/homework',      label: 'Homework',   icon: '✎' },
+  { href: '/behaviour',     label: 'Behaviour',  icon: '★' },
+  { href: '/attendance',    label: 'Attendance', icon: '✓' },
+  { href: '/announcements', label: 'News',       icon: '◉' },
+];
+
 function AppShellInner({ children, session }: { children: React.ReactNode; session: any }) {
   const pathname = usePathname();
-  const { pupils, activePupil, setActivePupilId } = usePupil();
 
   return (
     <div style={styles.root}>
-      <header style={styles.header}>
-        <div style={styles.headerInner}>
-          <div style={styles.headerLeft}>
-            <span style={styles.wordmark}>School Dashboard</span>
-            {pupils.length > 1 && (
-              <div style={styles.childSwitcher}>
-                {pupils.map(p => (
-                  <button
-                    key={p.id}
-                    style={{
-                      ...styles.childBtn,
-                      ...(activePupil?.id === p.id ? styles.childBtnActive : {}),
-                    }}
-                    onClick={() => setActivePupilId(p.id)}
-                  >
-                    {p.firstName}
-                  </button>
-                ))}
-              </div>
-            )}
-            {activePupil && pupils.length === 1 && (
-              <span style={styles.singlePupil}>{activePupil.firstName}</span>
-            )}
-          </div>
-          <div style={styles.headerRight}>
-            <span style={styles.userEmail}>{session.user?.email}</span>
-            {(session.user as any)?.isAdmin && (
-              <Link href="/admin" style={styles.adminLink}>Admin</Link>
-            )}
-            <button style={styles.signOutBtn} onClick={() => signOut()}>Sign out</button>
-          </div>
+      {/* Top bar — minimal */}
+      <header style={styles.topBar}>
+        <span style={styles.wordmark}>ClassCharts</span>
+        <div style={styles.topRight}>
+          {(session.user as any)?.isAdmin && (
+            <Link href="/admin" style={styles.adminLink}>Admin</Link>
+          )}
+          <span style={styles.userDot} title={session.user?.email ?? ''}>
+            {session.user?.email?.[0]?.toUpperCase()}
+          </span>
         </div>
-        <nav style={styles.nav}>
-          <div style={styles.navInner}>
-            {NAV.map(({ href, label }) => {
-              const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  style={{ ...styles.navLink, ...(active ? styles.navLinkActive : {}) }}
-                >
-                  {label}
-                  {active && <span style={styles.navUnderline} />}
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
       </header>
+
+      {/* Main content */}
       <main style={styles.main}>{children}</main>
+
+      {/* Bottom nav */}
+      <nav style={styles.bottomNav}>
+        {NAV.map(({ href, label, icon }) => {
+          const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
+          return (
+            <Link key={href} href={href} style={{ ...styles.navItem, color: active ? 'var(--text)' : 'var(--text-3)' }}>
+              <span style={{ ...styles.navIcon, background: active ? 'var(--surface-2)' : 'transparent' }}>{icon}</span>
+              <span style={{ ...styles.navLabel, fontWeight: active ? 600 : 400 }}>{label}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  root: { minHeight: '100vh', background: 'var(--bg)' },
-  header: { background: 'var(--surface)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 100 },
-  headerInner: { maxWidth: 1200, margin: '0 auto', padding: '16px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 },
-  headerLeft: { display: 'flex', alignItems: 'center', gap: 24 },
-  wordmark: { fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--text)', whiteSpace: 'nowrap' },
-  childSwitcher: { display: 'flex', gap: 4, background: 'var(--surface-2)', padding: 3, borderRadius: 6 },
-  childBtn: { padding: '4px 12px', borderRadius: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, fontFamily: 'var(--font-body)', color: 'var(--text-2)', fontWeight: 500, transition: 'all 0.15s' },
-  childBtnActive: { background: 'var(--surface)', color: 'var(--text)', boxShadow: 'var(--shadow)' },
-  singlePupil: { fontSize: 13, color: 'var(--text-2)', fontWeight: 500 },
-  headerRight: { display: 'flex', alignItems: 'center', gap: 16 },
-  userEmail: { fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
-  adminLink: { fontSize: 12, fontWeight: 500, color: 'var(--text-2)', padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 4 },
-  signOutBtn: { fontSize: 12, fontWeight: 500, color: 'var(--text-2)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' },
-  nav: { borderTop: '1px solid var(--border)' },
-  navInner: { maxWidth: 1200, margin: '0 auto', padding: '0 32px', display: 'flex' },
-  navLink: { position: 'relative', padding: '12px 16px', fontSize: 13, fontWeight: 500, color: 'var(--text-2)', display: 'block', transition: 'color 0.15s' },
-  navLinkActive: { color: 'var(--text)' },
-  navUnderline: { position: 'absolute', bottom: 0, left: 16, right: 16, height: 2, background: 'var(--text)', borderRadius: 2, display: 'block' },
-  main: { maxWidth: 1200, margin: '0 auto', padding: '40px 32px' },
-  authWrap: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' },
-  authCard: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '48px 56px', textAlign: 'center', maxWidth: 400, boxShadow: 'var(--shadow-md)' },
-  authTitle: { fontFamily: 'var(--font-display)', fontSize: 28, marginBottom: 12 },
-  authSub: { fontSize: 14, color: 'var(--text-2)', marginBottom: 32 },
-  signInBtn: { display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: 'var(--text)', color: '#fff', border: 'none', borderRadius: 4, fontSize: 14, fontWeight: 500, fontFamily: 'var(--font-body)', cursor: 'pointer' },
+  root: { minHeight: '100vh', display: 'flex', flexDirection: 'column', paddingBottom: 72 },
+  topBar: { position: 'sticky', top: 0, zIndex: 100, background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  wordmark: { fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 500, letterSpacing: '-0.01em' },
+  topRight: { display: 'flex', alignItems: 'center', gap: 12 },
+  adminLink: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', padding: '3px 8px', border: '1px solid var(--border)', borderRadius: 4 },
+  userDot: { width: 28, height: 28, borderRadius: '50%', background: 'var(--text)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-mono)', cursor: 'default' },
+  main: { flex: 1 },
+  bottomNav: { position: 'fixed', bottom: 0, left: 0, right: 0, background: 'var(--surface)', borderTop: '1px solid var(--border)', display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)' },
+  navItem: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 4px 6px', gap: 2, transition: 'color 0.15s' },
+  navIcon: { fontSize: 18, lineHeight: 1, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, transition: 'background 0.15s' },
+  navLabel: { fontSize: 9, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  authWrap: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 24 },
+  authCard: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '48px 40px', textAlign: 'center', maxWidth: 360, width: '100%', boxShadow: 'var(--shadow-md)' },
+  authTitle: { fontFamily: 'var(--font-display)', fontSize: 26, marginBottom: 10 },
+  authSub: { fontSize: 14, color: 'var(--text-2)', marginBottom: 28, lineHeight: 1.5 },
+  signInBtn: { display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: 'var(--text)', color: '#fff', border: 'none', borderRadius: 4, fontSize: 14, fontWeight: 500, fontFamily: 'var(--font-body)', cursor: 'pointer', width: '100%', justifyContent: 'center' },
 };
