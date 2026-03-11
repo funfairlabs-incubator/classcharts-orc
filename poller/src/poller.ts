@@ -1,19 +1,19 @@
 import { loginAllParents, todayStr, daysAgoStr } from '@classcharts/shared';
-import type { CCStudent } from '@classcharts/shared';
+import type { CCStudent, CCHomework } from '@classcharts/shared';
 import { getState, saveState } from './state.js';
 import { sendPushover } from './pushover.js';
-import { formatHomework, formatActivity, formatAnnouncement, formatAttendance, formatDetention } from './formatter.js';
+import { formatHomework, formatHomeworkOverdue, formatActivity, formatAnnouncement, formatAttendance, formatDetention } from './formatter.js';
 import { analyseAnnouncement, summariseHomework, summariseActivity } from './claude.js';
 import { ensureCalendarsExist, createCalendarEvents } from './calendar.js';
 
 export async function pollClassCharts(): Promise<void> {
   const from = daysAgoStr(30);
   const today = todayStr();
+  const aheadTo = daysAgoStr(-30);
 
   const parents = await loginAllParents();
   console.log(`Logged in ${parents.length} parent(s), found ${parents.reduce((n, p) => n + p.pupils.length, 0)} unique pupil(s)`);
 
-  // Ensure Google Calendars exist for all pupils
   const allStudents: CCStudent[] = parents.flatMap(p => p.pupils);
   let calendarConfig;
   try {
@@ -57,9 +57,10 @@ export async function pollClassCharts(): Promise<void> {
       // ── Homework ─────────────────────────────────────────────
       if (pupil.displayHomework) {
         try {
-          const homeworks = await client.getHomeworks(from, daysAgoStr(-14)); // -14 = 14 days ahead
-          const newHomeworks = homeworks.filter(h => h.id > state.lastHomeworkId);
+          const homeworks = await client.getHomeworks(from, aheadTo);
 
+          // New homework set
+          const newHomeworks = homeworks.filter(h => h.id > state.lastHomeworkId);
           for (const hw of newHomeworks) {
             const summary = await summariseHomework(hw);
             const msg = formatHomework(hw, pupil.name, summary);
@@ -70,6 +71,27 @@ export async function pollClassCharts(): Promise<void> {
             state.lastHomeworkId = Math.max(...newHomeworks.map(h => h.id));
             changed = true;
             console.log(`  ${pupil.name}: ${newHomeworks.length} new homework(s)`);
+          }
+
+          // Overdue homework — alert once per homework ID
+          const knownOverdueIds: number[] = (state as any).knownOverdueIds ?? [];
+          const overdueItems = homeworks.filter(h => {
+            const due = new Date(h.dueDate);
+            const isOverdue = due < new Date() && h.status !== 'completed' && !h.ticked;
+            return isOverdue && !knownOverdueIds.includes(h.id);
+          });
+
+          for (const hw of overdueItems) {
+            await sendPushover(formatHomeworkOverdue(hw, pupil.name));
+          }
+
+          if (overdueItems.length > 0) {
+            (state as any).knownOverdueIds = [
+              ...knownOverdueIds,
+              ...overdueItems.map(h => h.id),
+            ].slice(-100);
+            changed = true;
+            console.log(`  ${pupil.name}: ${overdueItems.length} newly overdue homework(s)`);
           }
         } catch (err) {
           console.error(`  Homework poll failed for ${pupil.name}:`, err);
@@ -90,7 +112,6 @@ export async function pollClassCharts(): Promise<void> {
               try {
                 await createCalendarEvents(analysis.calendarEvents, calendarConfig);
                 calendarAdded = true;
-                console.log(`  Created ${analysis.calendarEvents.length} calendar event(s) for announcement: ${ann.title}`);
               } catch (err) {
                 console.error('  Calendar event creation failed:', err);
               }
@@ -118,16 +139,32 @@ export async function pollClassCharts(): Promise<void> {
       if (pupil.displayAttendance) {
         try {
           const attendance = await client.getAttendance(today, today);
-          const newDays = attendance.days.filter(d => d.date > state.lastAttendanceDate);
+          // Use composite key: date+session to avoid re-alerting
+          const knownAttendanceKeys: string[] = (state as any).knownAttendanceKeys ?? [];
+          const newAlerts: string[] = [];
 
-          for (const day of newDays) {
-            const msg = formatAttendance(day, pupil.name);
-            if (msg) await sendPushover(msg); // only notify if absences/lates
+          for (const day of attendance.days) {
+            for (const [session, info] of Object.entries(day.sessions)) {
+              const key = `${day.date}:${session}:${info.status}`;
+              if (!knownAttendanceKeys.includes(key) && (info.status === 'absent' || info.status === 'late')) {
+                newAlerts.push(key);
+              }
+            }
           }
 
-          if (newDays.length > 0) {
-            state.lastAttendanceDate = newDays[newDays.length - 1].date;
+          if (newAlerts.length > 0) {
+            const newDays = attendance.days.filter(d =>
+              Object.entries(d.sessions).some(([sess, info]) =>
+                newAlerts.includes(`${d.date}:${sess}:${info.status}`)
+              )
+            );
+            for (const day of newDays) {
+              const msg = formatAttendance(day, pupil.name);
+              if (msg) await sendPushover(msg);
+            }
+            (state as any).knownAttendanceKeys = [...knownAttendanceKeys, ...newAlerts].slice(-200);
             changed = true;
+            console.log(`  ${pupil.name}: ${newAlerts.length} new attendance alert(s)`);
           }
         } catch (err) {
           console.error(`  Attendance poll failed for ${pupil.name}:`, err);
@@ -138,8 +175,6 @@ export async function pollClassCharts(): Promise<void> {
       if (pupil.displayDetentions) {
         try {
           const detentions = await client.getDetentions();
-          // Detentions don't have a reliable sequential ID in our state,
-          // use a composite key approach — store known IDs in state
           const knownIds: number[] = (state as any).knownDetentionIds ?? [];
           const newDetentions = detentions.filter(d => !knownIds.includes(d.id));
 
@@ -149,10 +184,7 @@ export async function pollClassCharts(): Promise<void> {
           }
 
           if (newDetentions.length > 0) {
-            (state as any).knownDetentionIds = [
-              ...knownIds,
-              ...newDetentions.map(d => d.id),
-            ].slice(-50); // keep last 50 to avoid unbounded growth
+            (state as any).knownDetentionIds = [...knownIds, ...newDetentions.map(d => d.id)].slice(-50);
             changed = true;
             console.log(`  ${pupil.name}: ${newDetentions.length} new detention(s)`);
           }

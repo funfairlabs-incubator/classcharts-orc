@@ -121,3 +121,17 @@ function formatDate(dateStr: string): string {
     return dateStr;
   }
 }
+
+// ── Homework Overdue ──────────────────────────────────────────
+
+export function formatHomeworkOverdue(
+  hw: CCHomework,
+  studentName: string,
+): PushoverMessage {
+  const due = formatDate(hw.dueDate);
+  return {
+    title: `⏰ Overdue — ${studentName}`,
+    message: `${hw.subject}: ${hw.title}\nWas due ${due}`,
+    priority: 1,
+  };
+}
