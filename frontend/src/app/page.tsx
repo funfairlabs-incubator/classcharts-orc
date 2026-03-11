@@ -28,7 +28,7 @@ export default function OverviewPage() {
       <PageHeader />
       <div style={styles.grid}>
         {pupils.map((pupil, i) => (
-          <StudentCard key={pupil.id} pupil={pupil} accent={STUDENT_ACCENTS[i % STUDENT_ACCENTS.length]} />
+          <StudentCard key={pupil.id} pupil={pupil} accent={STUDENT_ACCENTS[i % STUDENT_ACCENTS.length]} defaultExpanded={i === 0} />
         ))}
       </div>
     </div>
@@ -46,7 +46,8 @@ function PageHeader() {
   );
 }
 
-function StudentCard({ pupil, accent }: { pupil: CCStudent; accent: typeof STUDENT_ACCENTS[0] }) {
+function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; accent: typeof STUDENT_ACCENTS[0]; defaultExpanded?: boolean }) {
+  const [expanded, setExpanded] = useState(defaultExpanded ?? false);
   const today = new Date().toISOString().split('T')[0];
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
   const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
@@ -94,9 +95,12 @@ function StudentCard({ pupil, accent }: { pupil: CCStudent; accent: typeof STUDE
         <div style={{ ...styles.avatar, background: accent.color }}>
           {pupil.firstName[0]}{pupil.lastName[0]}
         </div>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <h2 style={styles.studentName}>{pupil.firstName} {pupil.lastName}</h2>
-          <p style={styles.schoolName}>{pupil.schoolName}</p>
+          {!expanded
+            ? <NowSummary lessons={lessons ?? []} accent={accent} />
+            : <p style={styles.schoolName}>{pupil.schoolName}</p>
+          }
         </div>
         {/* Traffic light */}
         {attendPct !== null && (
@@ -106,6 +110,14 @@ function StudentCard({ pupil, accent }: { pupil: CCStudent; accent: typeof STUDE
             <span style={styles.trafficLabel}>attend.</span>
           </Link>
         )}
+        {/* Expand toggle */}
+        <button
+          onClick={() => setExpanded(e => !e)}
+          style={{ ...styles.expandBtn, color: accent.color, background: accent.bg }}
+          aria-label={expanded ? 'Collapse' : 'Expand'}
+        >
+          {expanded ? '▲' : '▼'}
+        </button>
       </div>
 
       {/* Alert flags */}
@@ -124,21 +136,23 @@ function StudentCard({ pupil, accent }: { pupil: CCStudent; accent: typeof STUDE
         </div>
       )}
 
-      <hr style={styles.rule} />
+      {expanded && (
+        <>
+          <hr style={styles.rule} />
+          <div style={styles.section}>
+            <div style={styles.sectionHead}>
+              <span style={{ ...styles.sectionTitle, color: accent.color }}>Today's Timetable</span>
+            </div>
+            <TimetableTimeline
+              lessons={lessons ?? []}
+              href={`/timetable?pupil=${pupil.id}`}
+              accent={accent}
+            />
+          </div>
+        </>
+      )}
 
-      {/* ① Timetable */}
-      <div style={styles.section}>
-        <div style={styles.sectionHead}>
-          <span style={{ ...styles.sectionTitle, color: accent.color }}>Today's Timetable</span>
-        </div>
-        <TimetableTimeline
-          lessons={lessons ?? []}
-          href={`/timetable?pupil=${pupil.id}`}
-          accent={accent}
-        />
-      </div>
-
-      {nextEvents.length > 0 && (
+      {expanded && nextEvents.length > 0 && (
         <>
           <hr style={styles.rule} />
           <div style={styles.section}>
@@ -247,6 +261,55 @@ function eventTypeColor(type: string): string {
   return map[type] ?? '#6b7280';
 }
 
+function NowSummary({ lessons, accent }: { lessons: CCLesson[]; accent: typeof STUDENT_ACCENTS[0] }) {
+  const now = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+
+  function extractTime(t: string) {
+    const match = (t || '').match(/(\d{2}:\d{2})/);
+    return match ? match[1] : '00:00';
+  }
+  function toMins(t: string) {
+    const [h, m] = extractTime(t).split(':').map(Number);
+    return h * 60 + m;
+  }
+
+  const current = lessons.find(l => nowMins >= toMins(l.startTime) && nowMins < toMins(l.endTime));
+  const next = lessons.find(l => toMins(l.startTime) > nowMins && !l.isBreak);
+  const firstStart = lessons.length ? toMins(lessons[0].startTime) : 480;
+  const lastEnd = lessons.length ? toMins(lessons[lessons.length - 1].endTime) : 1020;
+
+  let text = '';
+  let sub = '';
+
+  if (nowMins < firstStart) {
+    text = 'Before school';
+    sub = next ? `First lesson: ${next.subjectName} at ${extractTime(next.startTime)}` : '';
+  } else if (nowMins >= lastEnd) {
+    text = 'School finished';
+    sub = '';
+  } else if (current) {
+    if (current.isBreak) {
+      const name = (current.periodName || '').toLowerCase();
+      text = name.includes('lunch') ? 'Lunch' : 'Break';
+      sub = next ? `Next: ${next.subjectName} at ${extractTime(next.startTime)}` : '';
+    } else {
+      text = current.subjectName || 'In a lesson';
+      sub = current.teacherName || '';
+    }
+  } else {
+    text = next ? `Next: ${next.subjectName}` : 'Free period';
+    sub = next ? `at ${extractTime(next.startTime)}` : '';
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <span style={{ fontSize: 13, fontWeight: 600, color: accent.color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{text}</span>
+      {sub && <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</span>}
+    </div>
+  );
+}
+
 function LoadingState() {
   return (
     <div style={styles.page}>
@@ -318,6 +381,7 @@ const styles: Record<string, React.CSSProperties> = {
   statSub: { fontSize: 11, color: 'var(--text-2)', fontWeight: 500 },
   annPreview: { fontSize: 12, fontWeight: 500, textAlign: 'center', lineHeight: 1.3, maxWidth: 120, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' },
   empty: { fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
+  expandBtn: { width: 30, height: 30, borderRadius: 6, border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 10, fontWeight: 700, flexShrink: 0, transition: 'background 0.15s' },
   eventList: { display: 'flex', flexDirection: 'column', gap: 8 },
   eventRow: { display: 'flex', alignItems: 'flex-start', gap: 10 },
   eventTypeDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 4 },
