@@ -33,6 +33,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [testing, setTesting] = useState<'idle'|'sending'|'ok'|'error'>('idle');
 
   useEffect(() => {
     fetch('/api/settings/prefs')
@@ -44,6 +45,15 @@ export default function SettingsPage() {
       })
       .catch(() => setLoading(false));
   }, []);
+
+  async function testNotification() {
+    setTesting('sending');
+    try {
+      const res = await fetch('/api/test-notification', { method: 'POST' });
+      setTesting(res.ok ? 'ok' : 'error');
+    } catch { setTesting('error'); }
+    setTimeout(() => setTesting('idle'), 4000);
+  }
 
   async function save() {
     setSaving(true);
@@ -110,6 +120,26 @@ export default function SettingsPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="card" style={{ padding: '20px 24px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+        <div>
+          <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>Test notification</p>
+          <p style={{ fontSize: 12, color: 'var(--text-2)' }}>Send a test Pushover to confirm everything is working</p>
+        </div>
+        <button
+          style={{
+            padding: '10px 18px', borderRadius: 6, border: '1px solid var(--border)',
+            fontSize: 13, fontWeight: 600, cursor: testing === 'sending' ? 'default' : 'pointer',
+            background: testing === 'ok' ? 'var(--positive-bg)' : testing === 'error' ? 'var(--negative-bg)' : 'var(--surface-2)',
+            color: testing === 'ok' ? 'var(--positive)' : testing === 'error' ? 'var(--negative)' : 'var(--text)',
+            flexShrink: 0,
+          }}
+          onClick={testNotification}
+          disabled={testing === 'sending'}
+        >
+          {testing === 'idle' ? '📱 Send test' : testing === 'sending' ? 'Sending…' : testing === 'ok' ? '✓ Delivered' : '✕ Failed'}
+        </button>
       </div>
 
       <div style={styles.saveRow}>
