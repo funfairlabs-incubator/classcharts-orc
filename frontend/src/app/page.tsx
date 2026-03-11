@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import { usePupil, useClassChartsData } from '@/lib/usePupil';
 import type { CCStudent, CCLesson, CCActivityPoint, CCHomework, CCAttendanceSummary, CCAnnouncement, UpcomingEvent, ArchivedAnnouncement } from '@classcharts/shared';
 import Link from 'next/link';
