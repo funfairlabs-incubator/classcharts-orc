@@ -184,7 +184,7 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
           href={`/behaviour?pupil=${pupil.id}`}
           accent={accent}
         >
-          <span style={{ color: behavScore >= 0 ? '#16a34a' : '#dc2626', fontSize: 22, fontFamily: 'var(--font-display)', fontWeight: 500 }}>
+          <span style={{ color: behavScore > 0 ? '#16a34a' : behavScore < 0 ? '#dc2626' : '#2563eb', fontSize: 22, fontFamily: 'var(--font-display)', fontWeight: 500 }}>
             {behavScore > 0 ? `+${behavScore}` : behavScore}
           </span>
           <span style={styles.statSub}>this week</span>
