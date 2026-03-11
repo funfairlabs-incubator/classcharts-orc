@@ -6,6 +6,8 @@ import { formatHomework, formatHomeworkOverdue, formatHomeworkStatusChange, form
 import { analyseAnnouncement, summariseHomework, summariseActivity } from './claude.js';
 import { ensureCalendarsExist, createCalendarEvents } from './calendar.js';
 import { getEnabledKeys } from './prefs.js';
+import { archiveAnnouncement, downloadAndSaveAttachments } from './archive.js';
+import { archiveAnnouncement, downloadAndSaveAttachments } from './archive.js';
 import { archiveAnnouncement } from './archive.js';
 
 export async function pollClassCharts(): Promise<void> {
@@ -119,8 +121,12 @@ export async function pollClassCharts(): Promise<void> {
           if (newAnnouncements.length > 0) {
             const keys = await getEnabledKeys('announcements');
             for (const ann of newAnnouncements) {
+              // Archive to Firestore + download attachments to GCS
+              await archiveAnnouncement(ann, pupil.id, pupil.name);
+              if (ann.attachments.length > 0) {
+                await downloadAndSaveAttachments(ann, pupil.id);
+              }
               const analysis = await analyseAnnouncement(ann, pupil.id, pupil.name);
-              await archiveAnnouncement(ann, pupil.id, analysis);
               let calendarAdded = false;
               if (analysis.calendarEvents.length > 0 && calendarConfig) {
                 try { await createCalendarEvents(analysis.calendarEvents, calendarConfig); calendarAdded = true; }
