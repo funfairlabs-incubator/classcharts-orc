@@ -80,8 +80,8 @@ function StudentCard({ pupil, accent }: { pupil: CCStudent; accent: typeof STUDE
     overdueHw.length > 0 && { text: `${overdueHw.length} overdue`, href: `/homework?pupil=${pupil.id}`, urgent: true },
     pupil.detentionPendingCount > 0 && { text: `${pupil.detentionPendingCount} detention${pupil.detentionPendingCount > 1 ? 's' : ''}`, href: `/detentions?pupil=${pupil.id}`, urgent: true },
     pupil.announcementsCount > 0 && { text: `${pupil.announcementsCount} unread`, href: `/announcements?pupil=${pupil.id}`, urgent: false },
-    consentPending.length > 0 && { text: `${consentPending.length} consent needed`, href: `https://app.classcharts.com`, urgent: true, external: true },
-  ].filter(Boolean) as { text: string; href: string; urgent: boolean; external?: boolean }[];
+    consentPending.length > 0 && { text: `${consentPending.length} consent needed`, href: `https://app.classcharts.com`, urgent: true, consent: true, external: true },
+  ].filter(Boolean) as { text: string; href: string; urgent: boolean; consent?: boolean; external?: boolean }[];
 
   return (
     <div className="card" style={{ ...styles.card, '--accent': accent.color, '--accent-bg': accent.bg, '--accent-border': accent.border } as any}>
@@ -114,11 +114,11 @@ function StudentCard({ pupil, accent }: { pupil: CCStudent; accent: typeof STUDE
           {flags.map((f, i) => (
             <Link key={i} href={f.href} target={f.external ? '_blank' : undefined} rel={f.external ? 'noreferrer' : undefined} style={{
               ...styles.flag,
-              background: f.urgent ? '#fef2f2' : accent.bg,
-              color: f.urgent ? '#b91c1c' : accent.color,
-              borderColor: f.urgent ? '#fecaca' : accent.border,
+              background: f.consent ? '#fff7ed' : f.urgent ? '#fef2f2' : accent.bg,
+              color: f.consent ? '#c2410c' : f.urgent ? '#b91c1c' : accent.color,
+              borderColor: f.consent ? '#fed7aa' : f.urgent ? '#fecaca' : accent.border,
             }}>
-              {f.urgent ? '⚠ ' : '● '}{f.text}
+              {f.consent ? '✍ ' : f.urgent ? '⚠ ' : '● '}{f.text}
             </Link>
           ))}
         </div>

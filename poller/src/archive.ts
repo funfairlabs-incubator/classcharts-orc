@@ -1,122 +1,118 @@
-import { Storage } from '@google-cloud/storage';
 import { Firestore } from '@google-cloud/firestore';
-import type { CCAnnouncement, ArchivedAnnouncement, CalendarEvent, UpcomingEvent } from '@classcharts/shared';
-import type { AnnouncementAnalysis } from './claude.js';
+import { Storage } from '@google-cloud/storage';
+import type { CCAnnouncement } from '@classcharts/shared';
 
-const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
 const db = new Firestore({ projectId: process.env.GCP_PROJECT_ID });
+const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
 const BUCKET = process.env.GCS_BUCKET!;
 
-// ── Download and archive attachment to GCS ────────────────────
-
-async function archiveAttachment(
-  url: string,
-  filename: string,
-  studentId: number,
-  announcementId: number,
-): Promise<string | null> {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const buffer = Buffer.from(await res.arrayBuffer());
-    const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const gcsPath = `attachments/${studentId}/${announcementId}/${safeName}`;
-    await storage.bucket(BUCKET).file(gcsPath).save(buffer, {
-      metadata: { contentDisposition: `attachment; filename="${filename}"` },
-    });
-    console.log(`  Archived attachment: ${gcsPath}`);
-    return gcsPath;
-  } catch (err) {
-    console.error(`  Failed to archive attachment ${filename}:`, err);
-    return null;
-  }
-}
-
-// ── Save announcement + attachments to Firestore + GCS ────────
+// ── Archive announcement to Firestore ─────────────────────────
 
 export async function archiveAnnouncement(
   ann: CCAnnouncement,
   studentId: number,
-  analysis: AnnouncementAnalysis,
+  studentName: string,
 ): Promise<void> {
   const docId = `${studentId}_${ann.id}`;
-
-  // Check if already archived
-  const existing = await db.collection('announcements').doc(docId).get();
-  if (existing.exists) return;
-
-  // Download attachments
-  const attachmentGcsPaths: Record<string, string> = {};
-  for (const att of ann.attachments) {
-    const gcsPath = await archiveAttachment(att.url, att.filename, studentId, ann.id);
-    if (gcsPath) attachmentGcsPaths[att.filename] = gcsPath;
-  }
-
-  const archived: ArchivedAnnouncement = {
+  await db.collection('announcements').doc(docId).set({
     ...ann,
     studentId,
+    studentName,
     archivedAt: new Date().toISOString(),
-    attachmentGcsPaths,
-    calendarEvents: analysis.calendarEvents,
-    aiSummary: analysis.summary,
-    requiresAction: analysis.requiresAction,
-    actionDescription: analysis.actionDescription,
-  };
+  }, { merge: true });
+}
 
-  await db.collection('announcements').doc(docId).set(archived);
-  console.log(`  Archived announcement ${ann.id}: "${ann.title}"`);
+// ── Download & save attachments to GCS ───────────────────────
 
-  // Also save upcoming events to their own collection for fast querying
-  for (let i = 0; i < analysis.calendarEvents.length; i++) {
-    const ev = analysis.calendarEvents[i];
-    if (!ev.date) continue;
-    const eventId = `${studentId}_${ann.id}_${i}`;
-    const upcomingEvent: UpcomingEvent = {
-      id: eventId,
-      studentId,
-      title: ev.title,
-      date: ev.date,
-      endDate: ev.endDate,
-      eventType: ev.eventType,
-      sourceAnnouncementId: ann.id,
-      description: ev.description,
-    };
-    await db.collection('upcoming_events').doc(eventId).set(upcomingEvent);
-    console.log(`  Saved upcoming event: "${ev.title}" on ${ev.date}`);
+export interface SavedAttachment {
+  filename: string;
+  gcsPath: string;
+  originalUrl: string;
+  contentType: string;
+  size: number;
+  savedAt: string;
+}
+
+export async function downloadAndSaveAttachments(
+  ann: CCAnnouncement,
+  studentId: number,
+): Promise<SavedAttachment[]> {
+  const saved: SavedAttachment[] = [];
+
+  for (const att of ann.attachments) {
+    const gcsPath = `attachments/${studentId}/${ann.id}/${att.filename}`;
+    const file = storage.bucket(BUCKET).file(gcsPath);
+
+    // Skip if already saved
+    const [exists] = await file.exists();
+    if (exists) {
+      console.log(`  Attachment already saved: ${gcsPath}`);
+      const [meta] = await file.getMetadata();
+      saved.push({
+        filename: att.filename,
+        gcsPath,
+        originalUrl: att.url,
+        contentType: meta.contentType ?? 'application/octet-stream',
+        size: Number(meta.size ?? 0),
+        savedAt: meta.timeCreated ?? new Date().toISOString(),
+      });
+      continue;
+    }
+
+    try {
+      console.log(`  Downloading attachment: ${att.filename}`);
+      const res = await fetch(att.url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const buffer = Buffer.from(await res.arrayBuffer());
+      const contentType = res.headers.get('content-type') ?? guessContentType(att.filename);
+
+      await file.save(buffer, { contentType, resumable: false });
+
+      const savedAtt: SavedAttachment = {
+        filename: att.filename,
+        gcsPath,
+        originalUrl: att.url,
+        contentType,
+        size: buffer.length,
+        savedAt: new Date().toISOString(),
+      };
+      saved.push(savedAtt);
+
+      // Record in Firestore for easy listing
+      await db.collection('attachments').add({
+        ...savedAtt,
+        studentId,
+        announcementId: ann.id,
+        announcementTitle: ann.title,
+        schoolName: ann.schoolName,
+        teacherName: ann.teacherName,
+        announcementDate: ann.timestamp,
+      });
+
+      console.log(`  Saved ${att.filename} (${(buffer.length / 1024).toFixed(0)}KB)`);
+    } catch (err) {
+      console.error(`  Failed to save attachment ${att.filename}:`, err);
+    }
   }
+
+  return saved;
 }
 
-// ── Read archived announcements (for frontend) ────────────────
-
-export async function getArchivedAnnouncements(studentId: number, limit = 100): Promise<ArchivedAnnouncement[]> {
-  const snapshot = await db.collection('announcements')
-    .where('studentId', '==', studentId)
-    .orderBy('timestamp', 'desc')
-    .limit(limit)
-    .get();
-  return snapshot.docs.map(d => d.data() as ArchivedAnnouncement);
-}
-
-// ── Read upcoming events for a student ───────────────────────
-
-export async function getUpcomingEvents(studentId: number, daysAhead = 60): Promise<UpcomingEvent[]> {
-  const from = new Date().toISOString().split('T')[0];
-  const to = new Date(Date.now() + daysAhead * 86400000).toISOString().split('T')[0];
-  const snapshot = await db.collection('upcoming_events')
-    .where('studentId', '==', studentId)
-    .where('date', '>=', from)
-    .where('date', '<=', to)
-    .orderBy('date', 'asc')
-    .get();
-  return snapshot.docs.map(d => d.data() as UpcomingEvent);
-}
-
-// ── Serve attachment from GCS (signed URL) ───────────────────
-
-export async function getAttachmentSignedUrl(gcsPath: string): Promise<string> {
-  const [url] = await storage.bucket(BUCKET).file(gcsPath).getSignedUrl({
-    action: 'read',
-    expires: Date.now() + 60 * 60 * 1000, // 1 hour
-  });
-  return url;
+function guessContentType(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  const map: Record<string, string> = {
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ppt: 'application/vnd.ms-powerpoint',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+  };
+  return map[ext] ?? 'application/octet-stream';
 }
