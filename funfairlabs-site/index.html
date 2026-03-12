@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FunFairLabs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f5f4f0;
+      --surface: #ffffff;
+      --surface-2: #f0ede6;
+      --border: #e2ddd4;
+      --text: #1a1916;
+      --text-2: #4a4740;
+      --text-3: #9a9690;
+      --orange: #f97316;
+      --indigo: #6366f1;
+      --radius: 16px;
+      --shadow: 0 2px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+      --shadow-hover: 0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── HEADER ─────────────────────────────────────────── */
+    header {
+      padding: 48px 24px 0;
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .wordmark {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .wordmark-top {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(32px, 6vw, 56px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+
+    .wm-fun { color: var(--orange); }
+    .wm-fair { color: var(--text); }
+    .wm-labs { color: var(--text-3); font-weight: 400; }
+
+    .wordmark-sub {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--text-3);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .claude-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #eef2ff;
+      color: var(--indigo);
+      border: 1px solid #c7d2fe;
+      border-radius: 100px;
+      padding: 3px 10px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+    }
+
+    .claude-dot {
+      width: 6px; height: 6px;
+      background: var(--indigo);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    /* ── SEARCH ─────────────────────────────────────────── */
+    .search-wrap {
+      flex: 1;
+      min-width: 220px;
+      max-width: 420px;
+      padding-top: 8px;
+    }
+
+    .search-form {
+      display: flex;
+      align-items: center;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 100px;
+      padding: 0 6px 0 18px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .search-form:focus-within {
+      border-color: var(--orange);
+      box-shadow: 0 0 0 3px rgba(249,115,22,0.1);
+    }
+
+    .search-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      color: var(--text);
+      padding: 12px 0;
+    }
+
+    .search-input::placeholder { color: var(--text-3); }
+
+    .search-btn {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: var(--text);
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s;
+      font-size: 14px;
+    }
+
+    .search-btn:hover { background: var(--orange); }
+
+    /* ── DIVIDER ─────────────────────────────────────────── */
+    .divider {
+      max-width: 1100px;
+      margin: 40px auto 0;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .divider-line { flex: 1; height: 1px; background: var(--border); }
+
+    .divider-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text-3);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    /* ── GRID ────────────────────────────────────────────── */
+    .grid {
+      max-width: 1100px;
+      margin: 24px auto 0;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    /* ── CARD ────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+      position: relative;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-hover);
+    }
+
+    .card-link {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .card-accent {
+      height: 4px;
+      width: 100%;
+    }
+
+    .card-body {
+      padding: 20px 22px 18px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+
+    .card-icon {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    .card-meta { flex: 1; min-width: 0; }
+
+    .card-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin-bottom: 3px;
+    }
+
+    .card-url {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--text-3);
+      letter-spacing: 0.04em;
+    }
+
+    .card-desc {
+      font-size: 13px;
+      color: var(--text-2);
+      line-height: 1.6;
+      margin-bottom: 14px;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 100px;
+    }
+
+    .status-live { background: #dcfce7; color: #15803d; }
+    .status-live::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #16a34a; }
+    .status-beta { background: #fef3c7; color: #b45309; }
+    .status-beta::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #d97706; }
+    .status-soon { background: #f1f5f9; color: #64748b; }
+    .status-soon::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; }
+
+    .card-arrow {
+      font-size: 16px;
+      color: var(--text-3);
+      transition: transform 0.2s, color 0.2s;
+    }
+
+    .card:hover .card-arrow { transform: translate(2px, -2px); color: var(--text); }
+
+    /* ── WIDE CARD (spans 2 cols) ──────────────────────── */
+    .card-wide {
+      grid-column: span 2;
+    }
+
+    @media (max-width: 700px) {
+      .card-wide { grid-column: span 1; }
+    }
+
+    /* ── STOCKS CARD ────────────────────────────────────── */
+    .stocks-body { padding: 20px 22px 18px; }
+
+    .stocks-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .stock-tile {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: default;
+    }
+
+    .stock-ticker {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-3);
+      margin-bottom: 4px;
+    }
+
+    .stock-price {
+      font-family: 'Syne', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .stock-change {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      font-weight: 500;
+      margin-top: 2px;
+    }
+
+    .up { color: #16a34a; }
+    .down { color: #dc2626; }
+    .flat { color: var(--text-3); }
+
+    .stocks-note {
+      font-size: 11px;
+      color: var(--text-3);
+      margin-top: 10px;
+      font-family: 'DM Mono', monospace;
+    }
+
+    /* ── PHOTO CAROUSEL ─────────────────────────────────── */
+    .carousel-wrap {
+      position: relative;
+      overflow: hidden;
+      height: 180px;
+      background: var(--surface-2);
+      border-radius: calc(var(--radius) - 2px);
+      margin: 14px 0;
+    }
+
+    .carousel-track {
+      display: flex;
+      height: 100%;
+      transition: transform 0.4s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    .carousel-slide {
+      min-width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      font-family: 'DM Mono', monospace;
+      color: var(--text-3);
+      background: var(--surface-2);
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .carousel-slide span {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .carousel-dots {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .carousel-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--border);
+      cursor: pointer;
+      border: none;
+      padding: 0;
+      transition: background 0.2s, transform 0.2s;
+    }
+
+    .carousel-dot.active { background: var(--text); transform: scale(1.3); }
+
+    .carousel-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      z-index: 2;
+      transition: background 0.15s;
+    }
+
+    .carousel-nav:hover { background: var(--surface); }
+    .carousel-prev { left: 10px; }
+    .carousel-next { right: 10px; }
+
+    /* ── BMC CARD ───────────────────────────────────────── */
+    .bmc-posts { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+
+    .bmc-post {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--surface-2);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .bmc-emoji { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
+    .bmc-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+
+    .bmc-date {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--text-3);
+    }
+
+    /* ── SECTION HEADS ──────────────────────────────────── */
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .section-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    /* ── FOOTER ─────────────────────────────────────────── */
+    footer {
+      max-width: 1100px;
+      margin: 56px auto 0;
+      padding: 24px 24px 40px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .footer-brand {
+      font-family: 'Syne', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .footer-meta {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--text-3);
+      letter-spacing: 0.06em;
+    }
+
+    /* ── ANIMATIONS ─────────────────────────────────────── */
+    .card { animation: fadeUp 0.4s ease both; }
+    .card:nth-child(1) { animation-delay: 0.05s; }
+    .card:nth-child(2) { animation-delay: 0.10s; }
+    .card:nth-child(3) { animation-delay: 0.15s; }
+    .card:nth-child(4) { animation-delay: 0.20s; }
+    .card:nth-child(5) { animation-delay: 0.25s; }
+    .card:nth-child(6) { animation-delay: 0.30s; }
+    .card:nth-child(7) { animation-delay: 0.35s; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── RESPONSIVE ─────────────────────────────────────── */
+    @media (max-width: 600px) {
+      header { padding: 32px 16px 0; }
+      .grid { padding: 0 16px; gap: 12px; }
+      .divider { padding: 0 16px; }
+      footer { padding: 24px 16px 32px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="wordmark">
+      <div class="wordmark-top">
+        <span class="wm-fun">Fun</span><span class="wm-fair">Fair</span><span class="wm-labs">Labs</span>
+      </div>
+      <div class="wordmark-sub">
+        Independent software &nbsp;·&nbsp;
+        <span class="claude-badge">
+          <span class="claude-dot"></span>
+          Powered by Claude
+        </span>
+      </div>
+    </div>
+
+    <div class="search-wrap">
+      <form class="search-form" onsubmit="doSearch(event)">
+        <input class="search-input" type="text" id="searchInput" placeholder="Search the web…" autocomplete="off" />
+        <button class="search-btn" type="submit">→</button>
+      </form>
+    </div>
+  </header>
+
+  <!-- APPS SECTION -->
+  <div class="divider">
+    <div class="divider-line"></div>
+    <span class="divider-label">Apps</span>
+    <div class="divider-line"></div>
+  </div>
+
+  <div class="grid" id="appsGrid">
+
+    <!-- ClassCharts -->
+    <a class="card card-link" href="https://classcharts.appspot.com" target="_blank" rel="noreferrer">
+      <div class="card-accent" style="background: linear-gradient(90deg, #3b82f6, #6366f1);"></div>
+      <div class="card-body">
+        <div class="card-header">
+          <div class="card-icon" style="background:#eff6ff;">🏫</div>
+          <div class="card-meta">
+            <div class="card-title">ClassCharts</div>
+            <div class="card-url">classcharts.appspot.com</div>
+          </div>
+        </div>
+        <p class="card-desc">School dashboard for tracking homework, behaviour, attendance and timetable. Claude-powered notifications and calendar sync.</p>
+        <div class="card-footer">
+          <span class="card-status status-live">Live</span>
+          <span class="card-arrow">↗</span>
+        </div>
+      </div>
+    </a>
+
+    <!-- Football League -->
+    <a class="card card-link" href="https://leaguepredictions.co.uk" target="_blank" rel="noreferrer">
+      <div class="card-accent" style="background: linear-gradient(90deg, #16a34a, #15803d);"></div>
+      <div class="card-body">
+        <div class="card-header">
+          <div class="card-icon" style="background:#f0fdf4;">⚽</div>
+          <div class="card-meta">
+            <div class="card-title">League Predictions</div>
+            <div class="card-url">leaguepredictions.co.uk</div>
+          </div>
+        </div>
+        <p class="card-desc">Football league prediction game. Pick your scores, track your points, compete with friends across the season.</p>
+        <div class="card-footer">
+          <span class="card-status status-live">Live</span>
+          <span class="card-arrow">↗</span>
+        </div>
+      </div>
+    </a>
+
+    <!-- Expenses -->
+    <div class="card">
+      <div class="card-accent" style="background: linear-gradient(90deg, #f97316, #f59e0b);"></div>
+      <div class="card-body">
+        <div class="card-header">
+          <div class="card-icon" style="background:#fff7ed;">💸</div>
+          <div class="card-meta">
+            <div class="card-title">Expenses</div>
+            <div class="card-url">coming soon</div>
+          </div>
+        </div>
+        <p class="card-desc">Personal expense tracking and reporting. Receipt capture, category splits, monthly summaries.</p>
+        <div class="card-footer">
+          <span class="card-status status-soon">Soon</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Buy Me a Coffee -->
+    <a class="card card-link" href="https://buymeacoffee.com" target="_blank" rel="noreferrer" id="bmcCard">
+      <div class="card-accent" style="background: linear-gradient(90deg, #f59e0b, #fbbf24);"></div>
+      <div class="card-body">
+        <div class="section-head">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="card-icon" style="background:#fffbeb;font-size:20px;">☕</div>
+            <div>
+              <div class="card-title">Buy Me a Coffee</div>
+              <div class="card-url">buymeacoffee.com</div>
+            </div>
+          </div>
+          <span class="card-arrow">↗</span>
+        </div>
+        <div class="bmc-posts" id="bmcPosts">
+          <div class="bmc-post">
+            <span class="bmc-emoji">📝</span>
+            <div>
+              <div class="bmc-title">Building ClassCharts Dashboard with Claude</div>
+              <div class="bmc-date">Mar 2026</div>
+            </div>
+          </div>
+          <div class="bmc-post">
+            <span class="bmc-emoji">⚽</span>
+            <div>
+              <div class="bmc-title">Season 2 of League Predictions is live</div>
+              <div class="bmc-date">Feb 2026</div>
+            </div>
+          </div>
+          <div class="bmc-post">
+            <span class="bmc-emoji">🚀</span>
+            <div>
+              <div class="bmc-title">FunFairLabs — what we're building</div>
+              <div class="bmc-date">Jan 2026</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </a>
+
+    <!-- Photo Carousel -->
+    <div class="card">
+      <div class="card-accent" style="background: linear-gradient(90deg, #ec4899, #8b5cf6);"></div>
+      <div class="card-body">
+        <div class="section-head">
+          <div class="card-title">Photos</div>
+          <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-3);" id="slideCounter">1 / 4</span>
+        </div>
+        <div class="carousel-wrap">
+          <div class="carousel-track" id="carouselTrack">
+            <div class="carousel-slide">🏞️<span>Add your photos</span></div>
+            <div class="carousel-slide">🌆<span>Edit carousel in admin</span></div>
+            <div class="carousel-slide">🌊<span>Drag &amp; drop upload</span></div>
+            <div class="carousel-slide">🌄<span>Coming soon</span></div>
+          </div>
+          <button class="carousel-nav carousel-prev" onclick="moveCarousel(-1)">‹</button>
+          <button class="carousel-nav carousel-next" onclick="moveCarousel(1)">›</button>
+        </div>
+        <div class="carousel-dots" id="carouselDots"></div>
+      </div>
+    </div>
+
+    <!-- Stocks -->
+    <div class="card">
+      <div class="card-accent" style="background: linear-gradient(90deg, #0ea5e9, #06b6d4);"></div>
+      <div class="stocks-body">
+        <div class="section-head">
+          <div class="card-title">Markets</div>
+          <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-3);" id="stocksTime">—</span>
+        </div>
+        <div class="stocks-grid" id="stocksGrid">
+          <!-- populated by JS -->
+        </div>
+        <p class="stocks-note" id="stocksNote">Loading…</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-brand">
+      <span style="color:var(--orange)">Fun</span><span>Fair</span><span style="color:var(--text-3);font-weight:400">Labs</span>
+      <span style="color:var(--indigo);font-weight:700"> + Claude</span>
+    </div>
+    <div class="footer-meta">Independent software · Built with ♥ in the UK</div>
+  </footer>
+
+  <script>
+    // ── SEARCH ──────────────────────────────────────────────
+    function doSearch(e) {
+      e.preventDefault();
+      const q = document.getElementById('searchInput').value.trim();
+      if (q) window.open('https://www.google.com/search?q=' + encodeURIComponent(q), '_blank');
+    }
+
+    // ── CAROUSEL ────────────────────────────────────────────
+    let carouselIdx = 0;
+    const slides = document.querySelectorAll('.carousel-slide');
+    const track = document.getElementById('carouselTrack');
+    const dotsContainer = document.getElementById('carouselDots');
+    const counter = document.getElementById('slideCounter');
+
+    slides.forEach((_, i) => {
+      const dot = document.createElement('button');
+      dot.className = 'carousel-dot' + (i === 0 ? ' active' : '');
+      dot.onclick = () => goToSlide(i);
+      dotsContainer.appendChild(dot);
+    });
+
+    function goToSlide(n) {
+      carouselIdx = (n + slides.length) % slides.length;
+      track.style.transform = `translateX(-${carouselIdx * 100}%)`;
+      document.querySelectorAll('.carousel-dot').forEach((d, i) => {
+        d.classList.toggle('active', i === carouselIdx);
+      });
+      counter.textContent = `${carouselIdx + 1} / ${slides.length}`;
+    }
+
+    function moveCarousel(dir) { goToSlide(carouselIdx + dir); }
+
+    // Auto-advance
+    setInterval(() => moveCarousel(1), 5000);
+
+    // ── STOCKS ──────────────────────────────────────────────
+    // Default UK tickers — admin can override via localStorage
+    const DEFAULT_TICKERS = ['LLOY.L','BP.L','VOD.L','HSBA.L','GSK.L','RIO.L'];
+
+    function getTickers() {
+      try {
+        const saved = localStorage.getItem('ffl_tickers');
+        return saved ? JSON.parse(saved) : DEFAULT_TICKERS;
+      } catch { return DEFAULT_TICKERS; }
+    }
+
+    function renderStockTile(ticker, price, change, pct) {
+      const dir = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat';
+      const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '—';
+      return `
+        <div class="stock-tile">
+          <div class="stock-ticker">${ticker.replace('.L','')}</div>
+          <div class="stock-price">${price !== null ? price.toFixed(2) : '—'}</div>
+          <div class="stock-change ${dir}">${arrow} ${pct !== null ? Math.abs(pct).toFixed(2) + '%' : ''}</div>
+        </div>`;
+    }
+
+    async function loadStocks() {
+      const tickers = getTickers();
+      const grid = document.getElementById('stocksGrid');
+      const note = document.getElementById('stocksNote');
+      const timeEl = document.getElementById('stocksTime');
+
+      // Render skeleton
+      grid.innerHTML = tickers.map(t => renderStockTile(t, null, null, null)).join('');
+
+      // Yahoo Finance via allorigins proxy to avoid CORS
+      let loaded = 0;
+      for (const ticker of tickers) {
+        try {
+          const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`;
+          const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+          const res = await fetch(proxy);
+          const outer = await res.json();
+          const data = JSON.parse(outer.contents);
+          const meta = data.chart.result[0].meta;
+          const price = meta.regularMarketPrice;
+          const prev = meta.previousClose ?? meta.chartPreviousClose;
+          const change = price - prev;
+          const pct = (change / prev) * 100;
+          // Replace that tile
+          const tiles = grid.querySelectorAll('.stock-tile');
+          const i = tickers.indexOf(ticker);
+          if (tiles[i]) tiles[i].outerHTML = renderStockTile(ticker, price, change, pct);
+          loaded++;
+        } catch { /* leave as — */ }
+      }
+
+      note.textContent = loaded > 0
+        ? `${loaded}/${tickers.length} loaded · 15min delay`
+        : 'Market data unavailable';
+      timeEl.textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    loadStocks();
+    setInterval(loadStocks, 5 * 60 * 1000); // refresh every 5 mins
+  </script>
+
+</body>
+</html>

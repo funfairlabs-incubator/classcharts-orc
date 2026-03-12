@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — FunFairLabs</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f5f4f0; --surface: #fff; --surface-2: #f0ede6;
+      --border: #e2ddd4; --text: #1a1916; --text-2: #4a4740; --text-3: #9a9690;
+      --orange: #f97316; --indigo: #6366f1; --radius: 12px;
+    }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+    .page { max-width: 680px; margin: 0 auto; padding: 48px 24px; }
+    h1 { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+    h1 span { color: var(--orange); }
+    .sub { font-size: 13px; color: var(--text-3); margin-bottom: 40px; font-family: 'DM Mono', monospace; }
+    .section { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; }
+    .section-title { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .section-title .icon { font-size: 16px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase; font-family: 'DM Mono', monospace; }
+    input, textarea {
+      width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 8px;
+      font-family: 'DM Mono', monospace; font-size: 13px; background: var(--surface-2);
+      color: var(--text); outline: none; transition: border-color 0.2s;
+      margin-bottom: 14px;
+    }
+    input:focus, textarea:focus { border-color: var(--orange); }
+    textarea { resize: vertical; min-height: 80px; }
+    .btn {
+      padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--text); color: #fff; }
+    .btn-orange { background: var(--orange); color: #fff; }
+    .btn-danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .row { display: flex; gap: 10px; align-items: flex-start; }
+    .row input { margin-bottom: 0; }
+
+    /* Ticker list */
+    .ticker-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; min-height: 36px; }
+    .ticker-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--surface-2); border: 1px solid var(--border); border-radius: 100px;
+      padding: 5px 12px; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500;
+    }
+    .ticker-chip button { background: none; border: none; cursor: pointer; color: var(--text-3); font-size: 14px; line-height: 1; padding: 0; }
+    .ticker-chip button:hover { color: #dc2626; }
+
+    /* App card list */
+    .app-card {
+      border: 1.5px solid var(--border); border-radius: 10px; padding: 14px 16px;
+      margin-bottom: 10px; display: flex; align-items: center; gap: 12px;
+    }
+    .app-card-icon { font-size: 22px; }
+    .app-card-info { flex: 1; min-width: 0; }
+    .app-card-name { font-weight: 600; font-size: 14px; }
+    .app-card-url { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-3); }
+
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--text); color: #fff; padding: 10px 20px; border-radius: 100px;
+      font-size: 13px; font-weight: 500; opacity: 0; transition: opacity 0.3s;
+      pointer-events: none; white-space: nowrap;
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <a href="index.html" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-3);text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-bottom:24px;">← Back to FunFairLabs</a>
+    <h1><span>Fun</span>FairLabs <span style="color:var(--text-3);font-weight:400;font-size:20px">Admin</span></h1>
+    <p class="sub">Changes save to your browser · no server required</p>
+
+    <!-- STOCKS -->
+    <div class="section">
+      <div class="section-title"><span class="icon">📈</span> Market Tickers</div>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:14px;">UK stocks use suffix <code style="background:var(--surface-2);padding:1px 5px;border-radius:4px;font-family:'DM Mono',monospace;font-size:11px">.L</code> e.g. <code style="background:var(--surface-2);padding:1px 5px;border-radius:4px;font-family:'DM Mono',monospace;font-size:11px">LLOY.L</code></p>
+      <div class="ticker-list" id="tickerList"></div>
+      <div class="row">
+        <input type="text" id="tickerInput" placeholder="e.g. LLOY.L" style="text-transform:uppercase" />
+        <button class="btn btn-primary btn-sm" onclick="addTicker()" style="white-space:nowrap;padding:10px 16px">Add</button>
+      </div>
+      <button class="btn btn-orange" onclick="saveTickers()">Save tickers</button>
+    </div>
+
+    <!-- APP CARDS -->
+    <div class="section">
+      <div class="section-title"><span class="icon">🃏</span> App Cards</div>
+      <div id="appCardList"></div>
+      <details style="margin-top:8px">
+        <summary style="cursor:pointer;font-size:13px;color:var(--text-2);font-weight:600;margin-bottom:14px;">+ Add new app card</summary>
+        <div style="margin-top:14px;">
+          <label>Icon (emoji)</label>
+          <input type="text" id="newIcon" placeholder="🚀" style="max-width:80px" />
+          <label>App name</label>
+          <input type="text" id="newName" placeholder="My App" />
+          <label>URL</label>
+          <input type="text" id="newUrl" placeholder="https://..." />
+          <label>Description</label>
+          <textarea id="newDesc" placeholder="What does this app do?"></textarea>
+          <label>Status</label>
+          <select id="newStatus" style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;background:var(--surface-2);margin-bottom:14px;outline:none">
+            <option value="live">Live</option>
+            <option value="beta">Beta</option>
+            <option value="soon">Coming Soon</option>
+          </select>
+          <label>Accent colour</label>
+          <input type="text" id="newColor" placeholder="#6366f1" />
+          <button class="btn btn-orange" onclick="addAppCard()">Add card</button>
+        </div>
+      </details>
+    </div>
+
+    <!-- BMC POSTS -->
+    <div class="section">
+      <div class="section-title"><span class="icon">☕</span> Buy Me a Coffee Posts</div>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:14px;">Add recent post titles to show on the homepage card.</p>
+      <div id="bmcList"></div>
+      <div class="row" style="margin-top:8px">
+        <input type="text" id="bmcEmoji" placeholder="📝" style="max-width:60px" />
+        <input type="text" id="bmcTitle" placeholder="Post title…" />
+        <input type="text" id="bmcDate" placeholder="Mar 2026" style="max-width:90px" />
+        <button class="btn btn-primary btn-sm" onclick="addBmcPost()" style="padding:10px 14px">Add</button>
+      </div>
+      <button class="btn btn-orange" style="margin-top:10px" onclick="saveBmc()">Save posts</button>
+    </div>
+
+    <!-- RESET -->
+    <button class="btn btn-danger" onclick="resetAll()" style="margin-top:8px">Reset all to defaults</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    function toast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 2500);
+    }
+
+    // ── TICKERS ──────────────────────────────────────────────
+    const DEFAULT_TICKERS = ['LLOY.L','BP.L','VOD.L','HSBA.L','GSK.L','RIO.L'];
+
+    function getTickers() {
+      try { return JSON.parse(localStorage.getItem('ffl_tickers') || 'null') || DEFAULT_TICKERS; }
+      catch { return DEFAULT_TICKERS; }
+    }
+
+    function renderTickers() {
+      const list = document.getElementById('tickerList');
+      const tickers = getTickers();
+      list.innerHTML = tickers.map((t, i) => `
+        <span class="ticker-chip">
+          ${t}
+          <button onclick="removeTicker(${i})">×</button>
+        </span>`).join('');
+    }
+
+    function addTicker() {
+      const input = document.getElementById('tickerInput');
+      const val = input.value.trim().toUpperCase();
+      if (!val) return;
+      const tickers = getTickers();
+      if (!tickers.includes(val)) tickers.push(val);
+      localStorage.setItem('ffl_tickers', JSON.stringify(tickers));
+      input.value = '';
+      renderTickers();
+    }
+
+    function removeTicker(i) {
+      const tickers = getTickers();
+      tickers.splice(i, 1);
+      localStorage.setItem('ffl_tickers', JSON.stringify(tickers));
+      renderTickers();
+    }
+
+    function saveTickers() {
+      toast('✓ Tickers saved — reload homepage to see changes');
+    }
+
+    document.getElementById('tickerInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); addTicker(); }
+    });
+
+    // ── APP CARDS ────────────────────────────────────────────
+    const DEFAULT_APPS = [
+      { icon:'🏫', name:'ClassCharts', url:'https://classcharts.appspot.com', desc:'School dashboard — homework, behaviour, attendance.', status:'live', color:'#3b82f6' },
+      { icon:'⚽', name:'League Predictions', url:'https://leaguepredictions.co.uk', desc:'Football prediction league game.', status:'live', color:'#16a34a' },
+      { icon:'💸', name:'Expenses', url:'', desc:'Personal expense tracking.', status:'soon', color:'#f97316' },
+    ];
+
+    function getApps() {
+      try { return JSON.parse(localStorage.getItem('ffl_apps') || 'null') || DEFAULT_APPS; }
+      catch { return DEFAULT_APPS; }
+    }
+
+    function renderAppCards() {
+      const apps = getApps();
+      document.getElementById('appCardList').innerHTML = apps.map((a, i) => `
+        <div class="app-card">
+          <span class="app-card-icon">${a.icon}</span>
+          <div class="app-card-info">
+            <div class="app-card-name">${a.name}</div>
+            <div class="app-card-url">${a.url || 'no url'}</div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="removeApp(${i})">Remove</button>
+        </div>`).join('');
+    }
+
+    function addAppCard() {
+      const app = {
+        icon: document.getElementById('newIcon').value.trim() || '🚀',
+        name: document.getElementById('newName').value.trim(),
+        url: document.getElementById('newUrl').value.trim(),
+        desc: document.getElementById('newDesc').value.trim(),
+        status: document.getElementById('newStatus').value,
+        color: document.getElementById('newColor').value.trim() || '#6366f1',
+      };
+      if (!app.name) return;
+      const apps = getApps();
+      apps.push(app);
+      localStorage.setItem('ffl_apps', JSON.stringify(apps));
+      renderAppCards();
+      toast('✓ Card added — reload homepage');
+    }
+
+    function removeApp(i) {
+      const apps = getApps();
+      apps.splice(i, 1);
+      localStorage.setItem('ffl_apps', JSON.stringify(apps));
+      renderAppCards();
+      toast('✓ Removed');
+    }
+
+    // ── BMC ──────────────────────────────────────────────────
+    const DEFAULT_BMC = [
+      { emoji:'📝', title:'Building ClassCharts Dashboard with Claude', date:'Mar 2026' },
+      { emoji:'⚽', title:'Season 2 of League Predictions is live', date:'Feb 2026' },
+      { emoji:'🚀', title:'FunFairLabs — what we\'re building', date:'Jan 2026' },
+    ];
+
+    function getBmc() {
+      try { return JSON.parse(localStorage.getItem('ffl_bmc') || 'null') || DEFAULT_BMC; }
+      catch { return DEFAULT_BMC; }
+    }
+
+    function renderBmc() {
+      document.getElementById('bmcList').innerHTML = getBmc().map((p, i) => `
+        <div class="app-card">
+          <span class="app-card-icon">${p.emoji}</span>
+          <div class="app-card-info">
+            <div class="app-card-name">${p.title}</div>
+            <div class="app-card-url">${p.date}</div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="removeBmc(${i})">Remove</button>
+        </div>`).join('');
+    }
+
+    function addBmcPost() {
+      const post = {
+        emoji: document.getElementById('bmcEmoji').value.trim() || '📝',
+        title: document.getElementById('bmcTitle').value.trim(),
+        date: document.getElementById('bmcDate').value.trim(),
+      };
+      if (!post.title) return;
+      const posts = getBmc();
+      posts.unshift(post);
+      localStorage.setItem('ffl_bmc', JSON.stringify(posts));
+      renderBmc();
+      ['bmcEmoji','bmcTitle','bmcDate'].forEach(id => document.getElementById(id).value = '');
+    }
+
+    function removeBmc(i) {
+      const posts = getBmc();
+      posts.splice(i, 1);
+      localStorage.setItem('ffl_bmc', JSON.stringify(posts));
+      renderBmc();
+    }
+
+    function saveBmc() { toast('✓ Posts saved — reload homepage'); }
+
+    // ── RESET ────────────────────────────────────────────────
+    function resetAll() {
+      if (!confirm('Reset everything to defaults?')) return;
+      ['ffl_tickers','ffl_apps','ffl_bmc'].forEach(k => localStorage.removeItem(k));
+      renderTickers(); renderAppCards(); renderBmc();
+      toast('✓ Reset to defaults');
+    }
+
+    // ── INIT ─────────────────────────────────────────────────
+    renderTickers();
+    renderAppCards();
+    renderBmc();
+  </script>
+</body>
+</html>
