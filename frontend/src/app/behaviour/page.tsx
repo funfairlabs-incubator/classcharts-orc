@@ -34,7 +34,7 @@ export default function BehaviourPage() {
         <>
           <div style={styles.summaryRow}>
             {[
-              { label: 'Net total', value: total > 0 ? `+${total}` : String(total), color: total >= 0 ? 'var(--positive)' : 'var(--negative)' },
+              { label: 'Net total', value: total > 0 ? `+${total}` : String(total), color: total > 0 ? 'var(--positive)' : total < 0 ? 'var(--negative)' : 'var(--info)' },
               { label: 'Positive', value: `+${positive}`, color: 'var(--positive)' },
               { label: 'Negative', value: String(negative), color: 'var(--negative)' },
             ].map(s => (
@@ -51,7 +51,7 @@ export default function BehaviourPage() {
             <div className="card" style={{ overflow: 'hidden', marginTop: 32 }}>
               {points.map((p, i) => (
                 <div key={p.id} style={{ ...styles.row, borderBottom: i < points.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                  <span style={{ ...styles.score, color: p.polarity === 'positive' ? 'var(--positive)' : 'var(--negative)', background: p.polarity === 'positive' ? 'var(--positive-bg)' : 'var(--negative-bg)' }}>
+                  <span style={{ ...styles.score, color: p.score > 0 ? 'var(--positive)' : p.score < 0 ? 'var(--negative)' : 'var(--info)', background: p.score > 0 ? 'var(--positive-bg)' : p.score < 0 ? 'var(--negative-bg)' : 'var(--info-bg)' }}>
                     {p.score > 0 ? '+' : ''}{p.score}
                   </span>
                   <div style={styles.detail}>

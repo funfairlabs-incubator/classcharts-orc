@@ -87,7 +87,7 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
   ].filter(Boolean) as { text: string; href: string; urgent: boolean; consent?: boolean; external?: boolean }[];
 
   return (
-    <div className="card" style={{ ...styles.card, '--accent': accent.color, '--accent-bg': accent.bg, '--accent-border': accent.border } as any}>
+    <div className="card" style={{ ...styles.card, '--accent': accent.color, '--accent-bg': accent.bg, '--accent-border': accent.border, overflow: 'hidden' } as any}>
 
       {/* Accent top stripe */}
       <div style={{ ...styles.stripe, background: accent.color }} />

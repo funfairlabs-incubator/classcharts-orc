@@ -13,11 +13,13 @@ export default function HomeworkPage() {
     [activePupil?.id],
   );
 
+  const twoDaysAgo = Date.now() - 2 * 86400000;
   const grouped = {
     late:      (homework ?? []).filter(h => h.status === 'late'),
     todo:      (homework ?? []).filter(h => h.status === 'not_completed' && !h.ticked),
     completed: (homework ?? []).filter(h => h.status === 'completed' || h.ticked),
   };
+  const isNew = (h: CCHomework) => new Date(h.issueDate).getTime() > twoDaysAgo;
 
   return (
     <div>
@@ -60,7 +62,7 @@ function Group({ title, items, muted, emptyMessage }: {
           {items.map((hw, i) => {
             const daysLeft = Math.ceil((new Date(hw.dueDate).getTime() - Date.now()) / 86400000);
             const urgency = hw.status === 'late' ? 'var(--negative)' :
-              daysLeft <= 1 ? 'var(--negative)' : daysLeft <= 3 ? 'var(--warning)' : 'var(--border)';
+              daysLeft <= 1 ? 'var(--warning)' : daysLeft <= 3 ? 'var(--info)' : 'var(--border)';
 
             return (
               <div key={hw.id} style={{ ...styles.row, borderBottom: i < items.length - 1 ? '1px solid var(--border)' : 'none' }}>
@@ -68,7 +70,10 @@ function Group({ title, items, muted, emptyMessage }: {
                 <div style={styles.rowContent}>
                   <div style={styles.rowTop}>
                     <div style={{ flex: 1 }}>
-                      <span style={styles.subject}>{hw.subject}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <span style={styles.subject}>{hw.subject}</span>
+                        {isNew(hw) && <span style={styles.newBadge}>NEW</span>}
+                      </div>
                       <p style={styles.hwTitle}>{hw.title}</p>
                       {hw.description && <p style={styles.description}>{hw.description}</p>}
                       {hw.completionTime && <p style={styles.completionTime}>⏱ {hw.completionTime}</p>}
@@ -80,10 +85,10 @@ function Group({ title, items, muted, emptyMessage }: {
                       <span style={styles.dateItem}>Set {formatDate(hw.issueDate)}</span>
                       <span style={{
                         ...styles.dateItem,
-                        color: urgency !== 'var(--border)' ? urgency : 'var(--text-3)',
-                        fontWeight: daysLeft <= 3 ? 500 : 400,
+                        color: hw.status === 'late' ? 'var(--negative)' : urgency !== 'var(--border)' ? urgency : 'var(--text-3)',
+                        fontWeight: daysLeft <= 3 ? 600 : 400,
                       }}>
-                        Due {formatDate(hw.dueDate)}
+                        {hw.status === 'late' ? '⚠ Overdue' : `Due ${formatDate(hw.dueDate)}`}
                       </span>
                     </div>
                   </div>
@@ -130,4 +135,5 @@ const styles: Record<string, React.CSSProperties> = {
   link: { fontSize: 12, color: 'var(--info)', display: 'block', marginTop: 4 },
   dates: { display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'right', flexShrink: 0 },
   dateItem: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' },
+  newBadge: { fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', background: '#dbeafe', color: '#1d4ed8', padding: '2px 6px', borderRadius: 100, fontFamily: 'var(--font-mono)' },
 };

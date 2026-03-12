@@ -18,7 +18,12 @@ export default function TimetablePage() {
   return (
     <div>
       <div style={styles.pageHeader}>
-        <h1 style={styles.pageTitle}>Timetable</h1>
+        <div>
+          <h1 style={styles.pageTitle}>Timetable</h1>
+          <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 4 }}>
+            {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
+        </div>
         <div style={styles.weekNav}>
           <button style={styles.navBtn} onClick={() => setSelectedDate(shiftDate(selectedDate, -7))}>← Prev week</button>
           <span style={styles.weekLabel}>{formatWeek(selectedDate)}</span>
@@ -125,12 +130,16 @@ function formatWeek(dateStr: string) {
   const days = getWeekDays(dateStr);
   const first = new Date(days[0].date);
   const last = new Date(days[4].date);
-  return `${first.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${last.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  const sameMonth = first.getMonth() === last.getMonth();
+  const firstStr = first.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const lastStr = last.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const year = last.getFullYear();
+  return `${firstStr} – ${lastStr} ${year}`;
 }
 
 const styles: Record<string, React.CSSProperties> = {
   pageHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, gap: 16 },
-  pageTitle: { fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 500 },
+  pageTitle: { fontSize: 24, fontWeight: 700, letterSpacing: '-0.01em' },
   rule: { border: 'none', borderTop: '1px solid var(--border)', marginBottom: 24 },
   weekNav: { display: 'flex', alignItems: 'center', gap: 16 },
   navBtn: { fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', background: 'none', border: '1px solid var(--border)', borderRadius: 4, padding: '6px 12px', cursor: 'pointer' },
