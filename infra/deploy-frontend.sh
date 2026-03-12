@@ -40,9 +40,18 @@ fs.writeFileSync('$REPO_ROOT/frontend/package.json', JSON.stringify(pkg, null, 2
 "
 
 echo "▶ Writing app.yaml with secrets..."
-BUILD_ID=$(gcloud builds list --limit=1 --format="value(id)" --project="$PROJECT_ID" 2>/dev/null | cut -c1-7 || echo "local")
 COMMIT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DEPLOYED_AT=$(date -u +"%d/%m/%Y %H:%M:%S GMT")
+APP_URL="https://${PROJECT_ID}.appspot.com"
+
+# Write build-info.json stamped at deploy time — read by Next.js at build time
+cat > "$REPO_ROOT/frontend/build-info.json" << JSON
+{
+  "commitSha": "${COMMIT_SHA}",
+  "deployedAt": "${DEPLOYED_AT}",
+  "appUrl": "${APP_URL}"
+}
+JSON
 
 cat > "$REPO_ROOT/frontend/app.yaml" << YAML
 runtime: nodejs22
@@ -65,9 +74,9 @@ env_variables:
   CLASSCHARTS_PARENT1_PASSWORD: "${CC_PASSWORD}"
   PUSHOVER_API_TOKEN: "${PUSHOVER_API_TOKEN}"
   PUSHOVER_USER_KEY: "${PUSHOVER_USER_KEY}"
-  NEXT_PUBLIC_BUILD_ID: "${BUILD_ID}"
   NEXT_PUBLIC_COMMIT_SHA: "${COMMIT_SHA}"
   NEXT_PUBLIC_DEPLOYED_AT: "${DEPLOYED_AT}"
+  NEXT_PUBLIC_APP_URL: "${APP_URL}"
 beta_settings:
   cloud_build_timeout: "900"
 YAML
