@@ -7,8 +7,6 @@ import { analyseAnnouncement, summariseHomework, summariseActivity } from './cla
 import { ensureCalendarsExist, createCalendarEvents } from './calendar.js';
 import { getEnabledKeys } from './prefs.js';
 import { archiveAnnouncement, downloadAndSaveAttachments } from './archive.js';
-import { archiveAnnouncement, downloadAndSaveAttachments } from './archive.js';
-import { archiveAnnouncement } from './archive.js';
 
 export async function pollClassCharts(): Promise<void> {
   const from = daysAgoStr(30);
