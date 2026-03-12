@@ -64,8 +64,11 @@ export async function getEnabledKeys(
 
   const keys: string[] = [];
 
-  // Check each configured user key
+  // Check each configured user key.
+  // If no prefs exist for this email yet, fall back to DEFAULT_PREFS (all enabled).
+  // This ensures notifications fire even before the user has visited /settings.
   for (const { key, email } of envKeys) {
+    if (!key) continue;
     const prefs = config.prefs.find(p => p.email.toLowerCase() === email.toLowerCase());
     const notifs = prefs?.notifications ?? DEFAULT_PREFS;
     if (notifs[toggle]) keys.push(key);
