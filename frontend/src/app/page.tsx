@@ -94,17 +94,28 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
 
       {/* Header */}
       <div style={styles.cardHead}>
-        <div style={{ ...styles.avatar, background: accent.color }}>
-          {pupil.firstName[0]}{pupil.lastName[0]}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h2 style={styles.studentName}>{pupil.firstName} {pupil.lastName}</h2>
-          {!expanded
-            ? <NowSummary lessons={lessons ?? []} accent={accent} />
-            : <p style={styles.schoolName}>{pupil.schoolName}</p>
-          }
-        </div>
-        {/* Traffic light */}
+        {/* Avatar + name = tap to expand/collapse */}
+        <button
+          onClick={() => setExpanded(e => !e)}
+          style={styles.cardToggle}
+          aria-label={expanded ? 'Collapse' : 'Expand'}
+        >
+          <div style={{ ...styles.avatar, background: accent.color }}>
+            {pupil.firstName[0]}{pupil.lastName[0]}
+          </div>
+          <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+            <h2 style={styles.studentName}>{pupil.firstName} {pupil.lastName}</h2>
+            {!expanded
+              ? <NowSummary lessons={lessons ?? []} accent={accent} />
+              : <p style={styles.schoolName}>{pupil.schoolName}</p>
+            }
+          </div>
+          <span style={{ fontSize: 10, color: accent.color, opacity: 0.6, flexShrink: 0, marginRight: 4 }}>
+            {expanded ? '▲' : '▼'}
+          </span>
+        </button>
+
+        {/* Traffic light — separate, always visible */}
         {attendPct !== null && (
           <Link href={`/attendance?pupil=${pupil.id}`} style={styles.trafficWrap}>
             <div style={{ ...styles.trafficDot, background: attendColor }} />
@@ -112,14 +123,6 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
             <span style={styles.trafficLabel}>attend.</span>
           </Link>
         )}
-        {/* Expand toggle */}
-        <button
-          onClick={() => setExpanded(e => !e)}
-          style={{ ...styles.expandBtn, color: accent.color, background: accent.bg }}
-          aria-label={expanded ? 'Collapse' : 'Expand'}
-        >
-          {expanded ? '▲' : '▼'}
-        </button>
       </div>
 
       {/* Alert flags */}
@@ -395,7 +398,7 @@ const styles: Record<string, React.CSSProperties> = {
   annPreview: { fontSize: 12, fontWeight: 500, textAlign: 'center', lineHeight: 1.3, maxWidth: 120, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' },
   empty: { fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
   pinnedAnn: { display: 'flex', alignItems: 'flex-start', gap: 4, margin: '12px 0 0', padding: '10px 14px', borderRadius: 8, border: '1px solid', textDecoration: 'none', transition: 'opacity 0.15s' },
-  expandBtn: { width: 30, height: 30, borderRadius: 6, border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 10, fontWeight: 700, flexShrink: 0, transition: 'background 0.15s' },
+  cardToggle: { display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, transition: 'opacity 0.15s' },
   eventList: { display: 'flex', flexDirection: 'column', gap: 8 },
   eventRow: { display: 'flex', alignItems: 'flex-start', gap: 10 },
   eventTypeDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 4 },
