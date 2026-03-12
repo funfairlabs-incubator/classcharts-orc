@@ -40,7 +40,8 @@ export async function downloadAndSaveAttachments(
   const saved: SavedAttachment[] = [];
 
   for (const att of ann.attachments) {
-    const gcsPath = `attachments/${studentId}/${ann.id}/${att.filename}`;
+    const filename = (att as any).fileName ?? att.filename; // API returns fileName, type says filename
+    const gcsPath = `attachments/${studentId}/${ann.id}/${filename}`;
     const file = storage.bucket(BUCKET).file(gcsPath);
 
     // Skip if already saved
@@ -49,7 +50,7 @@ export async function downloadAndSaveAttachments(
       console.log(`  Attachment already saved: ${gcsPath}`);
       const [meta] = await file.getMetadata();
       saved.push({
-        filename: att.filename,
+        filename,
         gcsPath,
         originalUrl: att.url,
         contentType: meta.contentType ?? 'application/octet-stream',
@@ -60,17 +61,17 @@ export async function downloadAndSaveAttachments(
     }
 
     try {
-      console.log(`  Downloading attachment: ${att.filename}`);
+      console.log(`  Downloading attachment: ${filename}`);
       const res = await fetch(att.url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const buffer = Buffer.from(await res.arrayBuffer());
-      const contentType = res.headers.get('content-type') ?? guessContentType(att.filename);
+      const contentType = res.headers.get('content-type') ?? guessContentType(filename);
 
       await file.save(buffer, { contentType, resumable: false });
 
       const savedAtt: SavedAttachment = {
-        filename: att.filename,
+        filename,
         gcsPath,
         originalUrl: att.url,
         contentType,
@@ -90,9 +91,9 @@ export async function downloadAndSaveAttachments(
         announcementDate: ann.timestamp,
       });
 
-      console.log(`  Saved ${att.filename} (${(buffer.length / 1024).toFixed(0)}KB)`);
+      console.log(`  Saved ${filename} (${(buffer.length / 1024).toFixed(0)}KB)`);
     } catch (err) {
-      console.error(`  Failed to save attachment ${att.filename}:`, err);
+      console.error(`  Failed to save attachment ${filename}:`, err);
     }
   }
 
