@@ -1,6 +1,7 @@
 'use client';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import Link from 'next/link';
+import { Footer } from './Footer';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import { PupilProvider } from '@/lib/usePupil';
@@ -125,6 +126,7 @@ function AppShellInner({ children, session }: { children: React.ReactNode; sessi
       </header>
 
       <main style={styles.main}>{children}</main>
+      <Footer />
     </div>
   );
 }
