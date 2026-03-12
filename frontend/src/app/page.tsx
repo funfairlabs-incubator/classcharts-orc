@@ -68,7 +68,8 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
   const overdueHw = (homeworkData ?? []).filter(h => new Date(h.dueDate) < now && h.status !== 'completed' && !h.ticked);
   const todoHw = (homeworkData ?? []).filter(h => h.status !== 'completed' && !h.ticked && new Date(h.dueDate) >= now);
   const attendPct = attendance ? parseFloat(attendance.overallPercentage) : null;
-  const latestAnn = (announcements ?? [])[0] ?? null;
+  const pinnedAnn = (announcements ?? []).find(a => (a as any).isPinned) ?? null;
+  const latestAnn = (announcements ?? []).find(a => !(a as any).isPinned) ?? null;
   const consentPending = (announcements ?? []).filter(a => a.requiresConsent && a.consentGiven === null);
   const nextEvents = (upcomingEvents ?? []).slice(0, 3);
 
@@ -214,6 +215,17 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
           </StatCell>
         )}
       </div>
+
+      {/* Pinned announcement — shown below stats, outside the grid */}
+      {pinnedAnn && (
+        <Link href={`/announcements?pupil=${pupil.id}`} style={{ ...styles.pinnedAnn, borderColor: accent.border, background: accent.bg }}>
+          <span style={{ fontSize: 12, marginRight: 6 }}>📌</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: accent.color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pinnedAnn.title}</p>
+            <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{pinnedAnn.teacherName}</p>
+          </div>
+        </Link>
+      )}
     </div>
   );
 }
@@ -382,6 +394,7 @@ const styles: Record<string, React.CSSProperties> = {
   statSub: { fontSize: 11, color: 'var(--text-2)', fontWeight: 500 },
   annPreview: { fontSize: 12, fontWeight: 500, textAlign: 'center', lineHeight: 1.3, maxWidth: 120, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' },
   empty: { fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
+  pinnedAnn: { display: 'flex', alignItems: 'flex-start', gap: 4, margin: '12px 0 0', padding: '10px 14px', borderRadius: 8, border: '1px solid', textDecoration: 'none', transition: 'opacity 0.15s' },
   expandBtn: { width: 30, height: 30, borderRadius: 6, border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 10, fontWeight: 700, flexShrink: 0, transition: 'background 0.15s' },
   eventList: { display: 'flex', flexDirection: 'column', gap: 8 },
   eventRow: { display: 'flex', alignItems: 'flex-start', gap: 10 },
