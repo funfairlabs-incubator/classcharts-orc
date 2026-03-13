@@ -12,10 +12,14 @@ echo "▶ Fetching identity token..."
 TOKEN=$(gcloud auth print-identity-token)
 
 echo "▶ Triggering poll..."
-curl -s -X POST "$SERVICE_URL" \
+RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SERVICE_URL" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"trigger":"scheduled"}' | jq .
+  -d '{"trigger":"scheduled"}')
+
+HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+BODY=$(echo "$RESPONSE" | head -1)
+echo "HTTP $HTTP_CODE: $BODY"
 
 echo ""
 echo "✅ Done — calendar config should now exist in GCS"
