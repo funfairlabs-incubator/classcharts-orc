@@ -26,3 +26,15 @@ gcloud run deploy "$SERVICE" \
 echo ""
 echo "✅ Poller deployed!"
 gcloud run services describe "$SERVICE" --region "$REGION" --format="value(status.url)"
+
+# Re-grant Pub/Sub invoker — Cloud Run deployments can reset IAM bindings
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
+echo ""
+echo "▶ Ensuring Pub/Sub can invoke Cloud Run..."
+gcloud run services add-iam-policy-binding "$SERVICE" \
+  --region="$REGION" \
+  --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com" \
+  --role="roles/run.invoker" \
+  --project="$PROJECT_ID" \
+  --quiet
+echo "✅ IAM binding confirmed"
