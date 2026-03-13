@@ -111,8 +111,8 @@ async function main() {
       }
 
       const description = [
-        hw.subjectName ? `Subject: ${hw.subjectName}` : '',
-        hw.descriptionText ?? '',
+        hw.subject ? `Subject: ${hw.subject}` : '',
+        hw.description ?? '',
       ].filter(Boolean).join('\n');
 
       const eventBody = {
