@@ -37,17 +37,17 @@ export default function HomeworkPage() {
 
       {!loading && !error && (
         <>
-          {grouped.late.length > 0 && <Group title="Overdue" items={grouped.late} />}
-          <Group title="To do" items={grouped.todo} emptyMessage="Nothing to do 🎉" />
-          <Group title="Completed" items={grouped.completed} muted />
+          {grouped.late.length > 0 && <Group title="Overdue" items={grouped.late} isNew={isNew} />}
+          <Group title="To do" items={grouped.todo} emptyMessage="Nothing to do 🎉" isNew={isNew} />
+          <Group title="Completed" items={grouped.completed} muted isNew={isNew} />
         </>
       )}
     </div>
   );
 }
 
-function Group({ title, items, muted, emptyMessage }: {
-  title: string; items: CCHomework[]; muted?: boolean; emptyMessage?: string;
+function Group({ title, items, muted, emptyMessage, isNew }: {
+  title: string; items: CCHomework[]; muted?: boolean; emptyMessage?: string; isNew: (h: CCHomework) => boolean;
 }) {
   if (items.length === 0 && !emptyMessage) return null;
   return (
