@@ -18,7 +18,6 @@ async function getAllowedEmails(): Promise<string[]> {
 }
 
 export const authOptions: NextAuthOptions = {
-  trustHost: true,
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
