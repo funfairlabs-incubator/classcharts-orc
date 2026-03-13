@@ -120,11 +120,12 @@ export async function pollClassCharts(): Promise<void> {
           if (newAnnouncements.length > 0) {
             const keys = await getEnabledKeys('announcements');
             console.log(`  New announcements: ${newAnnouncements.length}, pushover keys: ${keys.length}`);
+            const authHeaders = client.getAuthHeaders();
             for (const ann of newAnnouncements) {
               // Archive to Firestore + download attachments to GCS
               await archiveAnnouncement(ann, pupil.id, pupil.name);
               if (ann.attachments.length > 0) {
-                await downloadAndSaveAttachments(ann, pupil.id);
+                await downloadAndSaveAttachments(ann, pupil.id, authHeaders);
               }
               const analysis = await analyseAnnouncement(ann, pupil.id, pupil.name);
               let calendarAdded = false;
