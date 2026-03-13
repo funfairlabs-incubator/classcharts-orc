@@ -104,7 +104,7 @@ function AnnouncementCard({ ann, index }: { ann: AnnItem; index: number }) {
         <div style={styles.attachments}>
           <span style={styles.attachLabel}>Attachments</span>
           {ann.attachments.map((att, ai) => {
-            const gcsPaths = archived ? ann.attachmentGcsPaths : {};
+            const gcsPaths = ann.attachmentGcsPaths ?? {};
             const gcsPath = gcsPaths[att.filename];
             const href = gcsPath
               ? `/api/attachments/${gcsPath}`
