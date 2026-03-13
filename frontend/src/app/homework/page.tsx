@@ -31,8 +31,10 @@ export default function HomeworkPage() {
       <div style={styles.pageHeader}>
         <h1 style={styles.pageTitle}>Homework</h1>
         <div style={styles.legend}>
-          <span style={{ ...styles.dot, background: 'var(--negative)' }} /> Overdue
-          <span style={{ ...styles.dot, background: 'var(--warning)', marginLeft: 12 }} /> Due soon
+          <span style={legendChip('#fef2f2','#dc2626')}>● Overdue</span>
+          <span style={legendChip('#fff7ed','#ea580c')}>● Due tomorrow</span>
+          <span style={legendChip('#fffbeb','#d97706')}>● Due soon</span>
+          <span style={legendChip('#f0fdf4','#16a34a')}>● Done</span>
         </div>
       </div>
       <hr style={styles.rule} />
@@ -126,12 +128,20 @@ function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
+function legendChip(bg: string, color: string): React.CSSProperties {
+  return {
+    fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600,
+    padding: '3px 10px', borderRadius: 100,
+    background: bg, color,
+    border: `1px solid ${color}22`,
+  };
+}
+
 const styles: Record<string, React.CSSProperties> = {
   pageHeader: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 24 },
   pageTitle: { fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 500 },
   rule: { border: 'none', borderTop: '1px solid var(--border)', marginBottom: 40 },
-  legend: { display: 'flex', alignItems: 'center', fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
-  dot: { width: 8, height: 8, borderRadius: '50%', display: 'inline-block', marginRight: 6 },
+  legend: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' as const },
   groupTitle: { fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 500, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 },
   groupCount: { fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-3)', fontWeight: 400 },
   row: { display: 'flex', alignItems: 'stretch' },

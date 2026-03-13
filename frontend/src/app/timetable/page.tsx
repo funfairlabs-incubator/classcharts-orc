@@ -70,8 +70,8 @@ export default function TimetablePage() {
                   borderBottom: i < lessons.length - 1 ? '1px solid var(--border)' : 'none',
                 }}>
                   <div style={styles.timeBlock}>
-                    <span style={styles.startTime}>{lesson.startTime.slice(0, 5)}</span>
-                    <span style={styles.endTime}>{lesson.endTime.slice(0, 5)}</span>
+                    <span style={styles.startTime}>{extractHHMM(lesson.startTime)}</span>
+                    <span style={styles.endTime}>{extractHHMM(lesson.endTime)}</span>
                   </div>
                   <div style={styles.lessonDetail}>
                     <p style={{ ...styles.subject, color: lesson.isBreak ? 'var(--text-3)' : 'var(--text)' }}>
@@ -96,8 +96,14 @@ export default function TimetablePage() {
   );
 }
 
+function extractHHMM(t: string): string {
+  if (!t) return '00:00';
+  const match = t.match(/(\d{2}:\d{2})/);
+  return match ? match[1] : '00:00';
+}
+
 function timeMins(t: string) {
-  const [h, m] = t.split(':').map(Number);
+  const [h, m] = extractHHMM(t).split(':').map(Number);
   return h * 60 + m;
 }
 
