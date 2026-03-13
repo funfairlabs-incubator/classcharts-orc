@@ -19,7 +19,9 @@ gcloud services enable \
   firestore.googleapis.com \
   storage.googleapis.com \
   gmail.googleapis.com \
-  secretmanager.googleapis.com
+  secretmanager.googleapis.com \
+  calendar-json.googleapis.com \
+  tasks.googleapis.com
 
 # ── GCS Bucket ────────────────────────────────────────────────
 echo "▶ Creating GCS bucket: $BUCKET"
