@@ -71,14 +71,18 @@ async function main() {
   if (DRY_RUN) console.log('DRY RUN — pass --go to apply\n');
 
   const calConfig = await getCalendarConfig();
-  if (!calConfig) { console.error('No calendar config found — run the poller first'); process.exit(1); }
+  if (!calConfig) {
+    console.warn('⚠ No calendar config in GCS — calendar events will be skipped.');
+    console.warn('  Check poller logs, or run: gcloud storage ls gs://classcharts-attachments/config/\n');
+  } else {
+    console.log(`Family calendar: ${calConfig.familyCalendarId}`);
+  }
 
   const tasksConfig = await getTasksConfig();
   const auth = getAuth();
   const calendar = google.calendar({ version: 'v3', auth });
   const tasks = google.tasks({ version: 'v1', auth });
 
-  // Ensure task lists exist for each student
   const from = new Date(Date.now() - 14 * 86400000).toISOString().split('T')[0];
   const to   = new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0];
   const data = await getHomework(from, to);
@@ -99,9 +103,10 @@ async function main() {
     }
 
     const taskListId = tasksConfig.taskLists[pupil.id];
-    const studentCalId = calConfig.studentCalendars?.[pupil.id];
-    const calIds: string[] = [calConfig.familyCalendarId];
-    if (studentCalId && studentCalId !== calConfig.familyCalendarId) calIds.push(studentCalId);
+    const calIds: string[] = calConfig ? [calConfig.familyCalendarId] : [];
+    if (calConfig?.studentCalendars?.[pupil.id] && calConfig.studentCalendars[pupil.id] !== calConfig.familyCalendarId) {
+      calIds.push(calConfig.studentCalendars[pupil.id]);
+    }
 
     // Fetch existing tasks to avoid dupes
     let existingTaskTitles = new Set<string>();
@@ -121,8 +126,9 @@ async function main() {
       const calTitle  = `📚 ${hw.title}`;
 
       // ── Calendar event on issue date ──
-      console.log(`   CAL   "${calTitle}" on ${issueDate} (due ${dueDate})`);
-      if (!DRY_RUN) {
+      if (calIds.length > 0) console.log(`   CAL   "${calTitle}" on ${issueDate} (due ${dueDate})`);
+      else console.log(`   SKIP  CAL "${calTitle}" — no calendar config`);
+      if (!DRY_RUN && calIds.length > 0) {
         for (const calId of calIds) {
           try {
             await calendar.events.insert({
