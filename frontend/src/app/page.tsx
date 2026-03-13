@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePupil, useClassChartsData } from '@/lib/usePupil';
 import type { CCStudent, CCLesson, CCActivityPoint, CCHomework, CCAttendanceSummary, CCAnnouncement, UpcomingEvent, ArchivedAnnouncement } from '@classcharts/shared';
 import Link from 'next/link';
@@ -15,6 +15,13 @@ const STUDENT_ACCENTS = [
 
 export default function OverviewPage() {
   const { pupils, loading } = usePupil();
+  const [savedPalettes, setSavedPalettes] = useState<Record<number, typeof STUDENT_ACCENTS[0]>>({});
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('pupilPalettes');
+      if (saved) setSavedPalettes(JSON.parse(saved));
+    } catch { /* ignore */ }
+  }, []);
 
   if (loading) return <LoadingState />;
   if (!pupils.length) return (
@@ -29,7 +36,7 @@ export default function OverviewPage() {
       <PageHeader />
       <div style={styles.grid}>
         {pupils.map((pupil, i) => (
-          <StudentCard key={pupil.id} pupil={pupil} accent={STUDENT_ACCENTS[i % STUDENT_ACCENTS.length]} />
+          <StudentCard key={pupil.id} pupil={pupil} accent={savedPalettes[pupil.id] ?? STUDENT_ACCENTS[i % STUDENT_ACCENTS.length]} />
         ))}
       </div>
     </div>
@@ -82,7 +89,7 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
   const flags = [
     overdueHw.length > 0 && { text: `${overdueHw.length} overdue`, href: `/homework?pupil=${pupil.id}`, urgent: true },
     pupil.detentionPendingCount > 0 && { text: `${pupil.detentionPendingCount} detention${pupil.detentionPendingCount > 1 ? 's' : ''}`, href: `/detentions?pupil=${pupil.id}`, urgent: true },
-    pupil.announcementsCount > 0 && { text: `${pupil.announcementsCount} unread`, href: `/announcements?pupil=${pupil.id}`, urgent: false },
+    // unread count shown as pill in card header
     consentPending.length > 0 && { text: `${consentPending.length} consent needed`, href: `https://app.classcharts.com`, urgent: true, consent: true, external: true },
   ].filter(Boolean) as { text: string; href: string; urgent: boolean; consent?: boolean; external?: boolean }[];
 
@@ -107,21 +114,20 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
             <h2 style={styles.studentName}>{pupil.firstName} {pupil.lastName}</h2>
             <p style={styles.schoolName}>{pupil.schoolName}</p>
           </div>
-          <span style={{ fontSize: 10, color: accent.color, opacity: 0.6, flexShrink: 0, marginRight: 4 }}>
-            {expanded ? '▲' : '▼'}
-          </span>
         </button>
 
-      </div>
+        {/* Unread pill — top right, independently tappable */}
+        {pupil.announcementsCount > 0 && (
+          <Link href={`/announcements?pupil=${pupil.id}`} style={{ ...styles.unreadPill, background: accent.bg, color: accent.color, borderColor: accent.border }}>
+            {pupil.announcementsCount} unread
+          </Link>
+        )}
 
-      {/* Pinned announcement — full width strip below header */}
-      {pinnedAnn && (
-        <Link href={`/announcements?pupil=${pupil.id}`} style={{ ...styles.pinnedAnn, borderColor: accent.border, background: accent.bg }}>
-          <span style={{ fontSize: 12, flexShrink: 0 }}>📌</span>
-          <p style={{ fontSize: 12, fontWeight: 600, color: accent.color, flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', margin: 0 }}>{pinnedAnn.title}</p>
-          <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0, fontFamily: 'var(--font-mono)' }}>{pinnedAnn.teacherName}</span>
-        </Link>
-      )}
+        {/* Chevron — separate button so unread pill doesn't block expand */}
+        <button onClick={() => setExpanded(e => !e)} style={styles.chevronBtn} aria-label={expanded ? 'Collapse' : 'Expand'}>
+          <span style={{ fontSize: 11, color: accent.color, opacity: 0.7 }}>{expanded ? '▲' : '▼'}</span>
+        </button>
+      </div>
 
       {/* Alert flags */}
       {flags.length > 0 && (
@@ -211,6 +217,15 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
         )}
       </div>
 
+
+      {/* Pinned announcement — foot of card */}
+      {pinnedAnn && (
+        <Link href={`/announcements?pupil=${pupil.id}`} style={{ ...styles.pinnedAnn, borderColor: accent.border, background: accent.bg }}>
+          <span style={{ fontSize: 12, flexShrink: 0 }}>📌</span>
+          <p style={{ fontSize: 12, fontWeight: 600, color: accent.color, flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', margin: 0 }}>{pinnedAnn.title}</p>
+          <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0, fontFamily: 'var(--font-mono)' }}>{pinnedAnn.teacherName}</span>
+        </Link>
+      )}
 
     </div>
   );
@@ -346,13 +361,13 @@ const styles: Record<string, React.CSSProperties> = {
 
   card: { overflow: 'hidden', padding: 0 },
   stripe: { height: 4 },
-  cardHead: { display: 'flex', alignItems: 'center', gap: 14, padding: '18px 20px 14px' },
+  cardHead: { display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px 8px' },
   avatar: { width: 40, height: 40, borderRadius: '50%', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', flexShrink: 0, letterSpacing: '0.05em' },
   studentName: { fontSize: 18, fontWeight: 700, lineHeight: 1.2, marginBottom: 2 },
   schoolName: { fontSize: 11, color: 'var(--text-2)', fontWeight: 500 },
 
 
-  flagRow: { display: 'flex', gap: 6, flexWrap: 'wrap', padding: '0 20px 14px' },
+  flagRow: { display: 'flex', gap: 4, flexWrap: 'wrap', padding: '0 12px 8px' },
   flag: { fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 100, border: '1px solid', textDecoration: 'none' },
 
   rule: { border: 'none', borderTop: '1px solid var(--border)', margin: '0 20px' },
@@ -376,8 +391,10 @@ const styles: Record<string, React.CSSProperties> = {
   statSub: { fontSize: 11, color: 'var(--text-2)', fontWeight: 500 },
   annPreview: { fontSize: 12, fontWeight: 500, textAlign: 'center', lineHeight: 1.3, maxWidth: 120, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' },
   empty: { fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
-  pinnedAnn: { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderTop: '1px solid', borderBottom: '1px solid', textDecoration: 'none', overflow: 'hidden' },
-  cardToggle: { display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, transition: 'opacity 0.15s' },
+  pinnedAnn: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderTop: '1px solid', textDecoration: 'none', overflow: 'hidden' },
+  cardToggle: { display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', transition: 'opacity 0.15s' },
+  unreadPill: { fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 100, border: '1px solid', textDecoration: 'none', flexShrink: 0, whiteSpace: 'nowrap' as const },
+  chevronBtn: { background: 'none', border: 'none', cursor: 'pointer', padding: '4px 4px 4px 2px', display: 'flex', alignItems: 'center', flexShrink: 0 },
   eventList: { display: 'flex', flexDirection: 'column', gap: 8 },
   eventRow: { display: 'flex', alignItems: 'flex-start', gap: 10 },
   eventTypeDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 4 },
