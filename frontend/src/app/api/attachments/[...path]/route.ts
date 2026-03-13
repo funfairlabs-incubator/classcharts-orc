@@ -11,12 +11,30 @@ export async function GET(req: NextRequest, { params }: { params: { path: string
 
   const gcsPath = params.path.join('/');
   try {
-    const [url] = await storage.bucket(process.env.GCS_BUCKET!).file(gcsPath).getSignedUrl({
-      action: 'read',
-      expires: Date.now() + 60 * 60 * 1000, // 1 hour
+    const file = storage.bucket(process.env.GCS_BUCKET!).file(gcsPath);
+    const [exists] = await file.exists();
+    if (!exists) return NextResponse.json({ error: 'Attachment not found' }, { status: 404 });
+
+    const [metadata] = await file.getMetadata();
+    const contentType = metadata.contentType ?? 'application/octet-stream';
+    const filename = gcsPath.split('/').pop() ?? 'attachment';
+
+    const stream = file.createReadStream();
+    const chunks: Buffer[] = [];
+    await new Promise<void>((resolve, reject) => {
+      stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+      stream.on('end', resolve);
+      stream.on('error', reject);
     });
-    return NextResponse.redirect(url);
+
+    return new NextResponse(Buffer.concat(chunks), {
+      headers: {
+        'Content-Type': contentType,
+        'Content-Disposition': `inline; filename="${filename}"`,
+      },
+    });
   } catch (err) {
+    console.error('Attachment proxy error:', err);
     return NextResponse.json({ error: 'Attachment not found' }, { status: 404 });
   }
 }
