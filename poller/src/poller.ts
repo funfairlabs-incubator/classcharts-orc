@@ -25,7 +25,18 @@ export async function pollClassCharts(): Promise<void> {
     calendarConfig = await ensureCalendarsExist(allStudents.map(s => ({ id: s.id, name: s.name })));
     tasksConfig = await ensureTaskListsExist(allStudents.map(s => ({ id: s.id, name: s.name })));
   } catch (err) {
-    console.warn('Calendar setup failed (non-fatal):', err);
+    console.error('Calendar/Tasks setup failed:', err);
+    // Write diagnostic to GCS so we can inspect without log access
+    try {
+      const { Storage } = await import('@google-cloud/storage');
+      const st = new Storage({ projectId: process.env.GCP_PROJECT_ID });
+      await st.bucket(process.env.GCS_BUCKET!).file('config/calendar-init-error.txt').save(
+        `${new Date().toISOString()}
+${String(err)}
+${(err as any)?.stack ?? ''}`,
+        { contentType: 'text/plain' }
+      );
+    } catch { /* ignore diagnostic write failure */ }
   }
 
   for (const { client, pupils } of parents) {
