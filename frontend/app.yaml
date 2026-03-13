@@ -12,6 +12,7 @@ env_variables:
   GCS_BUCKET: "classcharts-attachments"
   GCS_ALLOWED_USERS_PATH: "config/allowed-users.json"
   NEXTAUTH_URL: "https://classcharts.funfairlabs.com"
+  NEXTAUTH_URL_INTERNAL: "https://classcharts.funfairlabs.com"
 
 beta_settings:
   cloud_build_timeout: "900"
