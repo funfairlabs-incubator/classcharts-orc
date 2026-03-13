@@ -109,6 +109,7 @@ export interface CCAnnouncement {
   requiresConsent: boolean;
   consentGiven: boolean | null;
   attachments: Array<{ filename: string; url: string }>;
+  attachmentGcsPaths?: Record<string, string>;
 }
 
 export interface CCDetention {
