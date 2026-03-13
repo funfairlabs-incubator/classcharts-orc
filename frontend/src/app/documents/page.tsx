@@ -128,9 +128,9 @@ export default function DocumentsPage() {
                         <span style={styles.fileName}>{doc.filename}</span>
                         <span style={styles.fileSize}>{fileSize(doc.size)}</span>
                       </div>
-                      {doc.signedUrl ? (
+                      {doc.gcsPath ? (
                         <a
-                          href={doc.signedUrl}
+                          href={`/api/attachments/${doc.gcsPath}`}
                           target="_blank"
                           rel="noreferrer"
                           style={styles.downloadBtn}
