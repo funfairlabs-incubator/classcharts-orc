@@ -3,19 +3,16 @@
  * backfill-attachments.ts
  *
  * Re-downloads attachments for announcements already archived in Firestore
- * but whose attachments weren't saved to GCS (e.g. due to missing auth headers).
+ * but whose attachments weren't saved to GCS (missing auth headers bug).
  *
  * Usage:
- *   npm run backfill-attachments           # dry run — shows what would be downloaded
- *   npm run backfill-attachments -- --go   # actually download and save to GCS
- *
- * Run from /scripts:
- *   cd scripts && npm run backfill-attachments -- --go
+ *   npm run backfill-attachments           # dry run
+ *   npm run backfill-attachments -- --go   # actually download
  */
 
 import { Firestore } from '@google-cloud/firestore';
 import { Storage } from '@google-cloud/storage';
-import { ClassChartsClient } from '@classcharts/shared';
+import { ParentClient } from 'classcharts-api';
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '../.env' });
 
@@ -26,27 +23,41 @@ const storage = new Storage({ projectId: PROJECT_ID });
 
 const DRY_RUN = !process.argv.includes('--go');
 
+function guessContentType(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  const map: Record<string, string> = {
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+  };
+  return map[ext] ?? 'application/octet-stream';
+}
+
 async function main() {
   if (DRY_RUN) console.log('DRY RUN — pass --go to actually download\n');
 
-  // Login to get authenticated client
   console.log('Logging in to ClassCharts...');
-  const client = new ClassChartsClient(
+  const rawClient = new ParentClient(
     process.env.CLASSCHARTS_PARENT1_EMAIL!,
     process.env.CLASSCHARTS_PARENT1_PASSWORD!,
   );
-  await client.login();
-  const authHeaders = client.getAuthHeaders();
-  console.log('Logged in.\n');
+  await rawClient.login();
 
-  // Fetch all archived announcements with attachments
+  const c = rawClient as any;
+  const authHeaders: Record<string, string> = {
+    Cookie: (c.authCookies ?? []).join(';'),
+    Authorization: `Basic ${c.sessionId ?? ''}`,
+  };
+  console.log(`Logged in. sessionId present: ${!!c.sessionId}\n`);
+
   const snapshot = await db.collection('announcements').get();
   const withAttachments = snapshot.docs.filter(d => {
     const data = d.data();
-    return data.attachments && data.attachments.length > 0;
+    return Array.isArray(data.attachments) && data.attachments.length > 0;
   });
 
-  console.log(`Found ${withAttachments.length} archived announcements with attachments.\n`);
+  console.log(`Found ${withAttachments.length} archived announcement(s) with attachments.\n`);
 
   let saved = 0;
   let skipped = 0;
@@ -59,26 +70,24 @@ async function main() {
     for (const att of ann.attachments) {
       const filename = att.filename ?? att.fileName;
       if (!filename || !att.url) {
-        console.log(`  ⚠ Skipping attachment with missing filename/url in ann ${ann.id}`);
+        console.log(`  ⚠ Skipping — missing filename or url in ann ${ann.id}`);
         continue;
       }
 
       const gcsPath = `attachments/${studentId}/${ann.id}/${filename}`;
       const file = storage.bucket(BUCKET).file(gcsPath);
 
-      // Check if already saved
       const [exists] = await file.exists();
       if (exists) {
-        console.log(`  ✓ Already saved: ${gcsPath}`);
+        console.log(`  ✓ Already in GCS: ${filename}`);
         skipped++;
         continue;
       }
 
-      console.log(`  → ${ann.title} / ${filename}`);
-      console.log(`    URL: ${att.url}`);
+      console.log(`  ↓ "${ann.title}" / ${filename}`);
 
       if (DRY_RUN) {
-        console.log(`    [dry run — would download and save to ${gcsPath}]`);
+        console.log(`    [dry run — would save to ${gcsPath}]`);
         saved++;
         continue;
       }
@@ -87,32 +96,27 @@ async function main() {
         const res = await fetch(att.url, { headers: authHeaders });
         if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
 
-        const contentType = res.headers.get('content-type') ?? 'application/octet-stream';
+        const contentType = res.headers.get('content-type') ?? guessContentType(filename);
         if (contentType.includes('text/html')) {
-          throw new Error(`Got HTML response — auth may have expired`);
+          throw new Error(`Got HTML response — session auth failed or URL expired`);
         }
 
         const buffer = Buffer.from(await res.arrayBuffer());
         await file.save(buffer, { contentType, resumable: false });
 
-        // Record in Firestore attachments collection
-        await db.collection('attachments').add({
-          filename,
-          gcsPath,
-          originalUrl: att.url,
-          contentType,
-          size: buffer.length,
-          savedAt: new Date().toISOString(),
-          studentId,
-          announcementId: ann.id,
-          announcementTitle: ann.title,
-          schoolName: ann.schoolName,
-          teacherName: ann.teacherName,
-          announcementDate: ann.timestamp,
-          backfilled: true,
-        });
+        const existing = await db.collection('attachments')
+          .where('gcsPath', '==', gcsPath).limit(1).get();
+        if (existing.empty) {
+          await db.collection('attachments').add({
+            filename, gcsPath, originalUrl: att.url, contentType,
+            size: buffer.length, savedAt: new Date().toISOString(),
+            studentId, announcementId: ann.id, announcementTitle: ann.title,
+            schoolName: ann.schoolName, teacherName: ann.teacherName,
+            announcementDate: ann.timestamp, backfilled: true,
+          });
+        }
 
-        console.log(`    ✓ Saved (${(buffer.length / 1024).toFixed(0)}KB)`);
+        console.log(`    ✓ Saved (${(buffer.length / 1024).toFixed(0)} KB)`);
         saved++;
       } catch (err) {
         console.error(`    ✗ Failed:`, err);
@@ -128,7 +132,4 @@ async function main() {
   process.exit(0);
 }
 
-main().catch(err => {
-  console.error('Fatal:', err);
-  process.exit(1);
-});
+main().catch(err => { console.error('Fatal:', err); process.exit(1); });
