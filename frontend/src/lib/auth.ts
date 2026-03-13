@@ -31,40 +31,12 @@ export const authOptions: NextAuthOptions = {
   ],
   cookies: {
     pkceCodeVerifier: {
-      name: '__Host-next-auth.pkce.code_verifier',
-      options: {
-        httpOnly: true,
-        sameSite: 'none',
-        path: '/',
-        secure: true,
-      },
+      name: 'next-auth.pkce.code_verifier',
+      options: { httpOnly: true, sameSite: 'none', path: '/', secure: true },
     },
     state: {
-      name: '__Host-next-auth.state',
-      options: {
-        httpOnly: true,
-        sameSite: 'none',
-        path: '/',
-        secure: true,
-      },
-    },
-    sessionToken: {
-      name: '__Secure-next-auth.session-token',
-      options: {
-        httpOnly: true,
-        sameSite: 'none',
-        path: '/',
-        secure: true,
-      },
-    },
-    callbackUrl: {
-      name: '__Secure-next-auth.callback-url',
-      options: {
-        httpOnly: false,
-        sameSite: 'none',
-        path: '/',
-        secure: true,
-      },
+      name: 'next-auth.state',
+      options: { httpOnly: true, sameSite: 'none', path: '/', secure: true },
     },
   },
   callbacks: {
@@ -93,7 +65,7 @@ export const authOptions: NextAuthOptions = {
     },
   },
   pages: {
-    signIn: '/auth/signin',
-    error: '/auth/error',
+    signIn: 'https://classcharts.funfairlabs.com/auth/signin',
+    error: 'https://classcharts.funfairlabs.com/auth/error',
   },
 };
