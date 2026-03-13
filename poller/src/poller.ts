@@ -60,6 +60,28 @@ export async function pollClassCharts(): Promise<void> {
             for (const hw of newHomeworks) {
               const summary = await summariseHomework(hw);
               await sendPushoverToKeys(keys, formatHomework(hw, pupil.name, summary));
+
+              // Add due-date event to Google Calendar
+              if (calendarConfig && hw.dueDate) {
+                try {
+                  const dueDate = hw.dueDate.split('T')[0]; // ensure YYYY-MM-DD
+                  const calEvent = {
+                    title: hw.title,
+                    date: dueDate,
+                    allDay: true,
+                    description: [
+                      hw.subjectName ? `Subject: ${hw.subjectName}` : '',
+                      summary ? summary : '',
+                    ].filter(Boolean).join('\n'),
+                    eventType: 'homework' as const,
+                    studentId: pupil.id,
+                  };
+                  await createCalendarEvents([calEvent], calendarConfig);
+                  console.log(`  Added homework to calendar: "${hw.title}" due ${dueDate}`);
+                } catch (calErr) {
+                  console.error(`  Calendar write failed for homework ${hw.id}:`, calErr);
+                }
+              }
             }
             state.lastHomeworkId = Math.max(...newHomeworks.map(h => h.id));
             changed = true;

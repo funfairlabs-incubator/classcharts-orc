@@ -180,7 +180,7 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
           href={`/behaviour?pupil=${pupil.id}`}
           accent={accent}
         >
-          <span style={{ color: behavScore > 0 ? '#16a34a' : behavScore < 0 ? '#dc2626' : '#2563eb', fontSize: 22, fontFamily: 'var(--font-display)', fontWeight: 500 }}>
+          <span style={{ color: behavScore > 0 ? '#16a34a' : behavScore < 0 ? '#dc2626' : accent.color, fontSize: 22, fontFamily: 'var(--font-display)', fontWeight: 500 }}>
             {behavScore > 0 ? `+${behavScore}` : behavScore}
           </span>
           <span style={styles.statSub}>this week</span>
@@ -188,7 +188,7 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
 
         <StatCell label="Homework" href={`/homework?pupil=${pupil.id}`} accent={accent}>
           <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
-            <span style={{ fontSize: 22, fontFamily: 'var(--font-display)', fontWeight: 500, color: overdueHw.length > 0 ? '#dc2626' : todoHw.length > 0 ? '#d97706' : '#16a34a' }}>
+            <span style={{ fontSize: 22, fontFamily: 'var(--font-display)', fontWeight: 500, color: overdueHw.length > 0 ? '#dc2626' : todoHw.length > 0 ? accent.color : '#16a34a' }}>
               {overdueHw.length > 0 ? overdueHw.length : todoHw.length}
             </span>
           </div>
@@ -239,7 +239,7 @@ function Section({ title, href, accent, children }: { title: string; href: strin
 function StatCell({ label, href, accent, children }: { label: string; href: string; accent: typeof STUDENT_ACCENTS[0]; children: React.ReactNode }) {
   return (
     <Link href={href} style={styles.statCell}>
-      <span style={{ ...styles.statLabel, color: 'var(--text-3)' }}>{label}</span>
+      <span style={{ ...styles.statLabel, color: 'var(--accent)' }}>{label}</span>
       {children}
     </Link>
   );
