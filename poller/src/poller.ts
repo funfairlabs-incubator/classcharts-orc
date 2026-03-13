@@ -5,10 +5,8 @@ import { sendPushoverToKeys } from './pushover.js';
 import { formatHomework, formatHomeworkOverdue, formatHomeworkStatusChange, formatActivity, formatAnnouncement, formatAttendance, formatDetention } from './formatter.js';
 import { analyseAnnouncement, summariseHomework, summariseActivity } from './claude.js';
 import { ensureCalendarsExist, createCalendarEvents, updateCalendarEventTitles } from './calendar.js';
+import { ensureTaskListsExist, createHomeworkTask, updateHomeworkTaskStatus, type HomeworkStatus } from './tasks.js';
 
-async function updateHomeworkCalendarEvents(eventIds: string[], newTitle: string, config: { familyCalendarId: string; studentCalendars: Record<number, string> }) {
-  await updateCalendarEventTitles(eventIds, newTitle, config.familyCalendarId);
-}
 import { getEnabledKeys } from './prefs.js';
 import { archiveAnnouncement, downloadAndSaveAttachments } from './archive.js';
 
@@ -22,8 +20,10 @@ export async function pollClassCharts(): Promise<void> {
 
   const allStudents: CCStudent[] = parents.flatMap(p => p.pupils);
   let calendarConfig;
+  let tasksConfig;
   try {
     calendarConfig = await ensureCalendarsExist(allStudents.map(s => ({ id: s.id, name: s.name })));
+    tasksConfig = await ensureTaskListsExist(allStudents.map(s => ({ id: s.id, name: s.name })));
   } catch (err) {
     console.warn('Calendar setup failed (non-fatal):', err);
   }
@@ -65,31 +65,55 @@ export async function pollClassCharts(): Promise<void> {
               const summary = await summariseHomework(hw);
               await sendPushoverToKeys(keys, formatHomework(hw, pupil.name, summary));
 
-              // Add due-date event to Google Calendar
-              if (calendarConfig && hw.dueDate) {
+              // Calendar event on issue date — "homework was set today"
+              if (calendarConfig && hw.issueDate) {
                 try {
-                  const dueDate = hw.dueDate.split('T')[0]; // ensure YYYY-MM-DD
+                  const issueDate = hw.issueDate.split('T')[0];
+                  const dueDate = hw.dueDate?.split('T')[0] ?? issueDate;
                   const calEvent = {
                     title: `📚 ${hw.title}`,
-                    date: dueDate,
+                    date: issueDate,
                     allDay: true,
                     description: [
                       hw.subject ? `Subject: ${hw.subject}` : '',
+                      `Due: ${dueDate}`,
                       summary ?? '',
                     ].filter(Boolean).join('\n'),
                     eventType: 'homework' as const,
                     studentId: pupil.id,
                   };
                   const createdIds = await createCalendarEvents([calEvent], calendarConfig);
-                  // Store calendar event IDs so we can update them on status change
                   if (createdIds.length > 0) {
                     const calMap: Record<number, string[]> = (state as any).homeworkCalendarIds ?? {};
                     calMap[hw.id] = createdIds;
                     (state as any).homeworkCalendarIds = calMap;
                   }
-                  console.log(`  Added homework to calendar: "${hw.title}" due ${dueDate}`);
+                  console.log(`  Added homework to calendar on issue date ${issueDate}: "${hw.title}"`);
                 } catch (calErr) {
                   console.error(`  Calendar write failed for homework ${hw.id}:`, calErr);
+                }
+              }
+
+              // Google Task with due date — actionable, syncable
+              if (tasksConfig && hw.dueDate) {
+                try {
+                  const taskId = await createHomeworkTask({
+                    homeworkId: hw.id,
+                    title: hw.title,
+                    subject: hw.subject ?? '',
+                    dueDate: hw.dueDate.split('T')[0],
+                    issueDate: hw.issueDate.split('T')[0],
+                    studentId: pupil.id,
+                    studentName: pupil.name,
+                    description: hw.description,
+                  }, tasksConfig);
+                  if (taskId) {
+                    const taskMap: Record<number, string> = (state as any).homeworkTaskIds ?? {};
+                    taskMap[hw.id] = taskId;
+                    (state as any).homeworkTaskIds = taskMap;
+                  }
+                } catch (taskErr) {
+                  console.error(`  Task creation failed for homework ${hw.id}:`, taskErr);
                 }
               }
             }
@@ -128,16 +152,26 @@ export async function pollClassCharts(): Promise<void> {
               const curr = hw.status ?? (hw.ticked ? 'ticked' : 'pending');
               await sendPushoverToKeys(keys, formatHomeworkStatusChange(hw, pupil.name, prev, curr));
 
-              // Update the calendar event title to reflect new status
+              // Update calendar event title
               if (calendarConfig && calMap[hw.id]?.length) {
                 try {
                   const isComplete = curr === 'completed' || curr === 'ticked';
                   const isLate = curr === 'late';
                   const prefix = isComplete ? '✅' : isLate ? '⚠️' : '📚';
-                  await updateHomeworkCalendarEvents(calMap[hw.id], `${prefix} ${hw.title}`, calendarConfig);
+                  await updateCalendarEventTitles(calMap[hw.id], `${prefix} ${hw.title}`, calendarConfig.familyCalendarId);
                   console.log(`  Updated calendar event for "${hw.title}": ${prev} → ${curr}`);
                 } catch (calErr) {
                   console.error(`  Calendar update failed for homework ${hw.id}:`, calErr);
+                }
+              }
+
+              // Update Google Task status
+              const taskMap: Record<number, string> = (state as any).homeworkTaskIds ?? {};
+              if (tasksConfig && taskMap[hw.id]) {
+                try {
+                  await updateHomeworkTaskStatus(taskMap[hw.id], pupil.id, curr as HomeworkStatus, tasksConfig);
+                } catch (taskErr) {
+                  console.error(`  Task status update failed for homework ${hw.id}:`, taskErr);
                 }
               }
             }

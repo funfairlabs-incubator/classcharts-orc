@@ -1,0 +1,183 @@
+#!/usr/bin/env npx ts-node
+/**
+ * backfill-homework-tasks.ts
+ *
+ * Creates Google Tasks for all current homework, and calendar events on
+ * issue date (replacing any previously created due-date events).
+ *
+ * Usage (from scripts/):
+ *   npm run backfill-homework-tasks           # dry run
+ *   npm run backfill-homework-tasks -- --go   # apply
+ */
+
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
+import { Storage } from '@google-cloud/storage';
+import { google } from 'googleapis';
+
+const DRY_RUN = !process.argv.includes('--go');
+const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
+
+// ── Config loaders ────────────────────────────────────────────
+
+async function getCalendarConfig() {
+  try {
+    const [c] = await storage.bucket(process.env.GCS_BUCKET!).file('config/calendar-ids.json').download();
+    return JSON.parse(c.toString());
+  } catch { return null; }
+}
+
+async function getTasksConfig() {
+  try {
+    const [c] = await storage.bucket(process.env.GCS_BUCKET!).file('config/tasks-ids.json').download();
+    return JSON.parse(c.toString());
+  } catch { return { taskLists: {} }; }
+}
+
+async function saveTasksConfig(config: any) {
+  await storage.bucket(process.env.GCS_BUCKET!).file('config/tasks-ids.json')
+    .save(JSON.stringify(config, null, 2), { contentType: 'application/json' });
+}
+
+// ── Google clients ────────────────────────────────────────────
+
+function getAuth() {
+  const auth = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
+  auth.setCredentials({ refresh_token: process.env.GCAL_REFRESH_TOKEN });
+  return auth;
+}
+
+// ── ClassCharts client (inline, no shared dep path issues) ────
+
+async function getHomework(from: string, to: string) {
+  // Use the shared package directly
+  const { ParentClient } = await import('../shared/src/classcharts.js');
+  const client = new ParentClient(
+    process.env.CLASSCHARTS_PARENT1_EMAIL!,
+    process.env.CLASSCHARTS_PARENT1_PASSWORD!,
+  );
+  await client.login();
+  const pupils = await client.getPupils();
+  const result: Array<{ pupil: any; homeworks: any[] }> = [];
+  for (const pupil of pupils) {
+    const homeworks = await client.getHomeworks(from, to, pupil.id);
+    result.push({ pupil, homeworks });
+  }
+  return result;
+}
+
+// ── Main ──────────────────────────────────────────────────────
+
+async function main() {
+  if (DRY_RUN) console.log('DRY RUN — pass --go to apply\n');
+
+  const calConfig = await getCalendarConfig();
+  if (!calConfig) { console.error('No calendar config found — run the poller first'); process.exit(1); }
+
+  const tasksConfig = await getTasksConfig();
+  const auth = getAuth();
+  const calendar = google.calendar({ version: 'v3', auth });
+  const tasks = google.tasks({ version: 'v1', auth });
+
+  // Ensure task lists exist for each student
+  const from = new Date(Date.now() - 14 * 86400000).toISOString().split('T')[0];
+  const to   = new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0];
+  const data = await getHomework(from, to);
+
+  for (const { pupil, homeworks } of data) {
+    console.log(`\n── ${pupil.name} (id: ${pupil.id})`);
+    console.log(`   ${homeworks.length} homework item(s) in window\n`);
+
+    // Ensure task list exists
+    if (!tasksConfig.taskLists[pupil.id]) {
+      if (!DRY_RUN) {
+        const list = await tasks.tasklists.insert({ requestBody: { title: `${pupil.name} — Homework` } });
+        tasksConfig.taskLists[pupil.id] = list.data.id;
+        console.log(`   Created task list: ${pupil.name} — Homework`);
+      } else {
+        console.log(`   WOULD create task list: ${pupil.name} — Homework`);
+      }
+    }
+
+    const taskListId = tasksConfig.taskLists[pupil.id];
+    const studentCalId = calConfig.studentCalendars?.[pupil.id];
+    const calIds: string[] = [calConfig.familyCalendarId];
+    if (studentCalId && studentCalId !== calConfig.familyCalendarId) calIds.push(studentCalId);
+
+    // Fetch existing tasks to avoid dupes
+    let existingTaskTitles = new Set<string>();
+    if (taskListId) {
+      try {
+        const res = await tasks.tasks.list({ tasklist: taskListId, maxResults: 500 });
+        for (const t of res.data.items ?? []) if (t.title) existingTaskTitles.add(t.title);
+      } catch { /* ignore */ }
+    }
+
+    for (const hw of homeworks) {
+      const issueDate = hw.issueDate?.split('T')[0];
+      const dueDate   = hw.dueDate?.split('T')[0];
+      if (!issueDate || !dueDate) { console.log(`   SKIP  "${hw.title}" — no dates`); continue; }
+
+      const taskTitle = `${pupil.name}: ${hw.subject ? `[${hw.subject}] ` : ''}${hw.title}`;
+      const calTitle  = `📚 ${hw.title}`;
+
+      // ── Calendar event on issue date ──
+      console.log(`   CAL   "${calTitle}" on ${issueDate} (due ${dueDate})`);
+      if (!DRY_RUN) {
+        for (const calId of calIds) {
+          try {
+            await calendar.events.insert({
+              calendarId: calId,
+              requestBody: {
+                summary: calTitle,
+                description: [
+                  hw.subject ? `Subject: ${hw.subject}` : '',
+                  `Due: ${dueDate}`,
+                  hw.description ?? '',
+                ].filter(Boolean).join('\n'),
+                start: { date: issueDate },
+                end: { date: issueDate },
+                reminders: { useDefault: false, overrides: [] },
+              },
+            });
+          } catch (err: any) { console.error(`     CAL error: ${err.message}`); }
+        }
+      }
+
+      // ── Google Task ──
+      if (existingTaskTitles.has(taskTitle)) {
+        console.log(`   SKIP  task "${taskTitle}" already exists`);
+        continue;
+      }
+      const isComplete = hw.status === 'completed' || hw.ticked;
+      const isLate     = hw.status === 'late';
+      console.log(`   TASK  "${taskTitle}" due ${dueDate} [${hw.status ?? 'pending'}]`);
+
+      if (!DRY_RUN && taskListId) {
+        try {
+          await tasks.tasks.insert({
+            tasklist: taskListId,
+            requestBody: {
+              title: taskTitle,
+              notes: [
+                hw.subject ? `Subject: ${hw.subject}` : '',
+                `Set: ${new Date(issueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`,
+                hw.description ?? '',
+              ].filter(Boolean).join('\n'),
+              due: `${dueDate}T00:00:00.000Z`,
+              status: isComplete ? 'completed' : 'needsAction',
+            },
+          });
+        } catch (err: any) { console.error(`     TASK error: ${err.message}`); }
+      }
+    }
+  }
+
+  if (!DRY_RUN) await saveTasksConfig(tasksConfig);
+  console.log('\nDone.');
+  process.exit(0);
+}
+
+main().catch(err => { console.error('Fatal:', err); process.exit(1); });
