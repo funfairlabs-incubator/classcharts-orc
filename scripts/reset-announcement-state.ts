@@ -16,7 +16,8 @@
 
 import { Firestore } from '@google-cloud/firestore';
 import * as dotenv from 'dotenv';
-dotenv.config({ path: '../.env' });
+import * as path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const PROJECT_ID = process.env.GCP_PROJECT_ID ?? 'classcharts';
 const db = new Firestore({ projectId: PROJECT_ID });
