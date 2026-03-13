@@ -106,10 +106,7 @@ export async function createCalendarEvents(
     const title = `${emoji} ${event.title}`;
 
     const studentCalId = config.studentCalendars[event.studentId];
-    const calendarIds = [config.familyCalendarId];
-    if (studentCalId && studentCalId !== config.familyCalendarId) {
-      calendarIds.push(studentCalId);
-    }
+    const calendarIds = studentCalId ? [studentCalId] : [config.familyCalendarId];
 
     const eventBody = event.allDay
       ? {
