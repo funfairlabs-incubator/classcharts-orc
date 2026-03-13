@@ -1,23 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// App Engine routes custom domains internally via appspot.com.
-// NextAuth reads x-forwarded-host to build redirect URLs, so we correct it here.
-export function middleware(req: NextRequest) {
-  const correctHost = process.env.NEXTAUTH_URL
-    ? new URL(process.env.NEXTAUTH_URL).host
-    : null;
+const CORRECT_HOST = 'classcharts.funfairlabs.com';
 
-  if (correctHost) {
-    const res = NextResponse.next();
-    const headers = new Headers(req.headers);
-    headers.set('x-forwarded-host', correctHost);
-    return NextResponse.next({
-      request: { headers },
-    });
-  }
-  return NextResponse.next();
+// App Engine internally routes all requests via appspot.com even on custom domains.
+// This causes Next.js and NextAuth to generate URLs with the wrong host.
+// We rewrite x-forwarded-host on every request so the correct domain is used everywhere.
+export function middleware(req: NextRequest) {
+  const headers = new Headers(req.headers);
+  headers.set('x-forwarded-host', CORRECT_HOST);
+  headers.set('x-forwarded-proto', 'https');
+  return NextResponse.next({ request: { headers } });
 }
 
 export const config = {
-  matcher: '/api/auth/:path*',
+  matcher: '/((?!_next/static|_next/image|favicon.ico).*)',
 };
