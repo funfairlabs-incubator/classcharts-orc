@@ -117,10 +117,8 @@ async function main() {
     }
 
     const taskListId = tasksConfig.taskLists[pupil.id];
-    const calIds: string[] = calConfig ? [calConfig.familyCalendarId] : [];
-    if (calConfig?.studentCalendars?.[pupil.id] && calConfig.studentCalendars[pupil.id] !== calConfig.familyCalendarId) {
-      calIds.push(calConfig.studentCalendars[pupil.id]);
-    }
+    const studentCalId = calConfig?.studentCalendars?.[pupil.id];
+    const calIds: string[] = studentCalId ? [studentCalId] : (calConfig ? [calConfig.familyCalendarId] : []);
 
     // Fetch existing tasks to avoid dupes
     let existingTaskTitles = new Set<string>();
