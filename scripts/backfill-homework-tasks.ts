@@ -52,16 +52,29 @@ function getAuth() {
 // ── ClassCharts client (inline, no shared dep path issues) ────
 
 async function getHomework(from: string, to: string) {
-  const { loginAllParents } = await import('../shared/src/parents.js');
-  const parents = await loginAllParents();
+  const { ParentClient } = await import('classcharts-api');
   const result: Array<{ pupil: any; homeworks: any[] }> = [];
-  for (const { client, pupils } of parents) {
+  const seenIds = new Set<number>();
+
+  for (let i = 1; i <= 5; i++) {
+    const email = process.env[`CLASSCHARTS_PARENT${i}_EMAIL`];
+    const password = process.env[`CLASSCHARTS_PARENT${i}_PASSWORD`];
+    if (!email || !password) continue;
+
+    const client = new ParentClient(email, password);
+    await client.login();
+    const { data: pupils } = await client.getPupils();
+
     for (const pupil of pupils) {
+      if (seenIds.has(pupil.id)) continue;
+      seenIds.add(pupil.id);
       client.selectPupil(pupil.id);
-      const homeworks = await client.getHomeworks(from, to);
+      const { data: homeworks } = await client.getHomeworks({ from, to, displayDate: 'due_date' });
       result.push({ pupil, homeworks });
     }
   }
+
+  if (result.length === 0) throw new Error('No parent credentials found in environment');
   return result;
 }
 
