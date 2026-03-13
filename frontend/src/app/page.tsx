@@ -112,14 +112,6 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
           </span>
         </button>
 
-        {/* Traffic light — separate, always visible */}
-        {attendPct !== null && (
-          <Link href={`/attendance?pupil=${pupil.id}`} style={styles.trafficWrap}>
-            <div style={{ ...styles.trafficDot, background: attendColor }} />
-            <span style={{ ...styles.trafficPct, color: attendColor }}>{attendPct.toFixed(0)}%</span>
-            <span style={styles.trafficLabel}>attend.</span>
-          </Link>
-        )}
       </div>
 
       {/* Pinned announcement — full width strip below header */}
@@ -359,10 +351,6 @@ const styles: Record<string, React.CSSProperties> = {
   studentName: { fontSize: 18, fontWeight: 700, lineHeight: 1.2, marginBottom: 2 },
   schoolName: { fontSize: 11, color: 'var(--text-2)', fontWeight: 500 },
 
-  trafficWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, textDecoration: 'none', background: 'var(--surface-2)', borderRadius: 8, padding: '8px 12px', border: '1px solid var(--border)' },
-  trafficDot: { width: 10, height: 10, borderRadius: '50%' },
-  trafficPct: { fontSize: 16, fontWeight: 700, lineHeight: 1 },
-  trafficLabel: { fontSize: 10, color: 'var(--text-2)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' },
 
   flagRow: { display: 'flex', gap: 6, flexWrap: 'wrap', padding: '0 20px 14px' },
   flag: { fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 100, border: '1px solid', textDecoration: 'none' },
