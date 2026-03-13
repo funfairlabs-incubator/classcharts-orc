@@ -21,7 +21,7 @@ export default function HomeworkPage() {
 
   const grouped = {
     late:      [...(homework ?? []).filter(h => h.status === 'late')].sort(sortByDueAsc),
-    todo:      [...(homework ?? []).filter(h => h.status === 'not_completed' && !h.ticked)].sort(sortByDueAsc),
+    todo:      [...(homework ?? []).filter(h => (h.status === 'not_completed' || h.status === null) && !h.ticked)].sort(sortByDueAsc),
     completed: [...(homework ?? []).filter(h => h.status === 'completed' || h.ticked)].sort(sortByIssueDesc),
   };
   const isNew = (h: CCHomework) => new Date(h.issueDate).getTime() > twoDaysAgo;
@@ -66,8 +66,10 @@ function Group({ title, items, muted, emptyMessage, isNew }: {
         <div className="card" style={{ overflow: 'hidden' }}>
           {items.map((hw, i) => {
             const daysLeft = Math.ceil((new Date(hw.dueDate).getTime() - Date.now()) / 86400000);
+            const isCompleted = hw.status === 'completed' || hw.ticked;
             // Explicit colours — CSS vars for these are both dark brown, visually too similar at stripe width
-            const urgency = hw.status === 'late' ? '#dc2626'   // red — overdue
+            const urgency = isCompleted ? '#16a34a'             // green — done
+              : hw.status === 'late' ? '#dc2626'                // red — overdue
               : daysLeft <= 1 ? '#ea580c'                       // orange — due tomorrow
               : daysLeft <= 3 ? '#d97706'                       // amber — due soon
               : 'var(--border)';                                 // grey — fine
@@ -93,7 +95,7 @@ function Group({ title, items, muted, emptyMessage, isNew }: {
                       <span style={styles.dateItem}>Set {formatDate(hw.issueDate)}</span>
                       <span style={{
                         ...styles.dateItem,
-                        color: hw.status === 'late' ? '#dc2626' : urgency !== 'var(--border)' ? urgency : 'var(--text-3)',
+                        color: isCompleted ? '#16a34a' : hw.status === 'late' ? '#dc2626' : urgency !== 'var(--border)' ? urgency : 'var(--text-3)',
                         fontWeight: daysLeft <= 3 ? 600 : 400,
                       }}>
                         {hw.status === 'late' ? '⚠ Overdue' : `Due ${formatDate(hw.dueDate)}`}

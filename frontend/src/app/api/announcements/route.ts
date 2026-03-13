@@ -23,7 +23,20 @@ export async function GET(req: NextRequest) {
       .get();
 
     if (!snapshot.empty) {
-      return NextResponse.json(snapshot.docs.map(d => d.data()));
+      // Normalise archived docs — early-archived ones may be missing fields added later
+      const docs = snapshot.docs.map(d => {
+        const data = d.data();
+        return {
+          ...data,
+          attachments: data.attachments ?? [],
+          attachmentGcsPaths: data.attachmentGcsPaths ?? {},
+          calendarEvents: data.calendarEvents ?? [],
+          aiSummary: data.aiSummary ?? null,
+          requiresAction: data.requiresAction ?? false,
+          actionDescription: data.actionDescription ?? null,
+        };
+      });
+      return NextResponse.json(docs);
     }
 
     // Fall back to live ClassCharts if archive not populated yet
