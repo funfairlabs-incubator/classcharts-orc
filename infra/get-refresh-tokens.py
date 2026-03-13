@@ -24,6 +24,7 @@ if not CLIENT_ID or not CLIENT_SECRET:
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.modify",
     "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/tasks",
 ]
 
 client_config = {
@@ -52,6 +53,6 @@ print("✅  Refresh token obtained!")
 print("="*60)
 print(f"\nGCAL_REFRESH_TOKEN={creds.refresh_token}")
 print(f"GMAIL_REFRESH_TOKEN={creds.refresh_token}")
-print("\n(Both Calendar and Gmail share the same refresh token")
-print(" since we requested both scopes in one flow.)")
+print("\n(Calendar, Gmail and Tasks share the same refresh token")
+print(" since we requested all scopes in one flow.)")
 print("="*60 + "\n")
