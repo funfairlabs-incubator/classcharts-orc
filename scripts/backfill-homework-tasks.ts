@@ -70,7 +70,7 @@ async function getHomework(from: string, to: string) {
       seenIds.add(pupil.id);
       client.selectPupil(pupil.id);
       const homeworkRes = await client.getHomeworks({ from, to, displayDate: 'due_date' });
-      const homeworks = homeworkRes.data ?? homeworkRes;
+      const homeworks = (homeworkRes.data ?? homeworkRes) as any[];
       result.push({ pupil, homeworks });
     }
   }
