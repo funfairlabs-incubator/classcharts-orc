@@ -90,7 +90,7 @@ export async function createHomeworkTask(
   const notes = [
     `Subject: ${hw.subject}`,
     `Set: ${formatDate(hw.issueDate)}`,
-    hw.description ? `\n${hw.description}` : '',
+    hw.description ? `\n${hw.description.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim()}` : '',
   ].filter(Boolean).join('\n');
 
   // Tasks API due date must be an RFC 3339 timestamp (midnight UTC)
