@@ -1,6 +1,7 @@
 'use client';
 import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
+import { usePupil } from '@/lib/usePupil';
 
 interface NotificationPrefs {
   homeworkDigest: boolean;
@@ -26,6 +27,17 @@ const DEFAULT_PREFS: NotificationPrefs = {
   behaviour: true, detentions: true, attendance: true, announcements: true,
 };
 
+const PALETTE_PRESETS = [
+  { label: 'Blue',    color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
+  { label: 'Amber',   color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+  { label: 'Green',   color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' },
+  { label: 'Violet',  color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
+  { label: 'Rose',    color: '#be185d', bg: '#fdf2f8', border: '#fbcfe8' },
+  { label: 'Teal',    color: '#0f766e', bg: '#f0fdfa', border: '#99f6e4' },
+  { label: 'Orange',  color: '#c2410c', bg: '#fff7ed', border: '#fed7aa' },
+  { label: 'Slate',   color: '#475569', bg: '#f8fafc', border: '#cbd5e1' },
+];
+
 export default function SettingsPage() {
   const { data: session } = useSession();
   const [prefs, setPrefs] = useState<NotificationPrefs>(DEFAULT_PREFS);
@@ -34,8 +46,14 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState<'idle'|'sending'|'ok'|'error'>('idle');
+  const { pupils } = usePupil();
+  const [palettes, setPalettes] = useState<Record<number, typeof PALETTE_PRESETS[0]>>({});
 
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem('pupilPalettes');
+      if (saved) setPalettes(JSON.parse(saved));
+    } catch { /* ignore */ }
     fetch('/api/settings/prefs')
       .then(r => r.json())
       .then(d => {
@@ -53,6 +71,12 @@ export default function SettingsPage() {
       setTesting(res.ok ? 'ok' : 'error');
     } catch { setTesting('error'); }
     setTimeout(() => setTesting('idle'), 4000);
+  }
+
+  function setPupilPalette(pupilId: number, preset: typeof PALETTE_PRESETS[0]) {
+    const updated = { ...palettes, [pupilId]: preset };
+    setPalettes(updated);
+    try { localStorage.setItem('pupilPalettes', JSON.stringify(updated)); } catch { /* ignore */ }
   }
 
   async function save() {
@@ -141,6 +165,44 @@ export default function SettingsPage() {
           {testing === 'idle' ? '📱 Send test' : testing === 'sending' ? 'Sending…' : testing === 'ok' ? '✓ Delivered' : '✕ Failed'}
         </button>
       </div>
+
+      {pupils.length > 0 && (
+        <div className="card" style={styles.section}>
+          <h2 style={styles.sectionTitle}>Card Colours</h2>
+          <p style={styles.sectionDesc}>Choose an accent colour for each child's card on the dashboard.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {pupils.map(pupil => {
+              const current = palettes[pupil.id] ?? PALETTE_PRESETS[0];
+              return (
+                <div key={pupil.id}>
+                  <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{pupil.firstName}</p>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {PALETTE_PRESETS.map(preset => (
+                      <button
+                        key={preset.label}
+                        onClick={() => setPupilPalette(pupil.id, preset)}
+                        title={preset.label}
+                        style={{
+                          width: 32, height: 32, borderRadius: '50%',
+                          background: preset.color,
+                          border: current.color === preset.color ? '3px solid var(--text)' : '3px solid transparent',
+                          outline: current.color === preset.color ? `2px solid ${preset.color}` : 'none',
+                          outlineOffset: 2,
+                          cursor: 'pointer',
+                          transition: 'transform 0.15s',
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <p style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginTop: 6 }}>
+                    Selected: <span style={{ color: current.color, fontWeight: 600 }}>{current.label}</span>
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div style={styles.saveRow}>
         <button style={{ ...styles.saveBtn, opacity: saving ? 0.6 : 1 }} onClick={save} disabled={saving}>
