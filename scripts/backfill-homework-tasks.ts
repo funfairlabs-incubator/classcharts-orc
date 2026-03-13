@@ -52,17 +52,15 @@ function getAuth() {
 // ── ClassCharts client (inline, no shared dep path issues) ────
 
 async function getHomework(from: string, to: string) {
-  const { ClassChartsParentClient } = await import('../shared/src/classcharts.js');
-  const client = new ClassChartsParentClient(
-    process.env.CLASSCHARTS_PARENT1_EMAIL!,
-    process.env.CLASSCHARTS_PARENT1_PASSWORD!,
-  );
-  await client.login();
-  const pupils = await client.getPupils();
+  const { loginAllParents } = await import('../shared/src/parents.js');
+  const parents = await loginAllParents();
   const result: Array<{ pupil: any; homeworks: any[] }> = [];
-  for (const pupil of pupils) {
-    const homeworks = await client.getHomeworks(from, to, pupil.id);
-    result.push({ pupil, homeworks });
+  for (const { client, pupils } of parents) {
+    for (const pupil of pupils) {
+      client.selectPupil(pupil.id);
+      const homeworks = await client.getHomeworks(from, to);
+      result.push({ pupil, homeworks });
+    }
   }
   return result;
 }
