@@ -69,7 +69,8 @@ async function getHomework(from: string, to: string) {
       if (seenIds.has(pupil.id)) continue;
       seenIds.add(pupil.id);
       client.selectPupil(pupil.id);
-      const { data: homeworks } = await client.getHomeworks({ from, to, displayDate: 'due_date' });
+      const homeworkRes = await client.getHomeworks({ from, to, displayDate: 'due_date' });
+      const homeworks = homeworkRes.data ?? homeworkRes;
       result.push({ pupil, homeworks });
     }
   }
@@ -131,11 +132,12 @@ async function main() {
     }
 
     for (const hw of homeworks) {
-      const issueDate = hw.issueDate?.split('T')[0];
-      const dueDate   = hw.dueDate?.split('T')[0];
+      const issueDate = (hw.issueDate ?? hw.issue_date)?.split('T')[0];
+      const dueDate   = (hw.dueDate   ?? hw.due_date)?.split('T')[0];
       if (!issueDate || !dueDate) { console.log(`   SKIP  "${hw.title}" — no dates`); continue; }
 
-      const taskTitle = `${pupil.name}: ${hw.subject ? `[${hw.subject}] ` : ''}${hw.title}`;
+      const subject = hw.subject ?? hw.subject_name ?? '';
+      const taskTitle = `${pupil.name}: ${subject ? `[${subject}] ` : ''}${hw.title}`;
       const calTitle  = `📚 ${hw.title}`;
 
       // ── Calendar event on issue date ──
@@ -149,9 +151,9 @@ async function main() {
               requestBody: {
                 summary: calTitle,
                 description: [
-                  hw.subject ? `Subject: ${hw.subject}` : '',
+                  subject ? `Subject: ${subject}` : '',
                   `Due: ${dueDate}`,
-                  hw.description ?? '',
+                  hw.description ?? hw.description ?? '',
                 ].filter(Boolean).join('\n'),
                 start: { date: issueDate },
                 end: { date: issueDate },
@@ -167,7 +169,7 @@ async function main() {
         console.log(`   SKIP  task "${taskTitle}" already exists`);
         continue;
       }
-      const isComplete = hw.status === 'completed' || hw.ticked;
+      const isComplete = hw.status === 'completed' || hw.ticked === true || hw.ticked === 1;
       const isLate     = hw.status === 'late';
       console.log(`   TASK  "${taskTitle}" due ${dueDate} [${hw.status ?? 'pending'}]`);
 
@@ -178,7 +180,7 @@ async function main() {
             requestBody: {
               title: taskTitle,
               notes: [
-                hw.subject ? `Subject: ${hw.subject}` : '',
+                subject ? `Subject: ${subject}` : '',
                 `Set: ${new Date(issueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`,
                 hw.description ?? '',
               ].filter(Boolean).join('\n'),
