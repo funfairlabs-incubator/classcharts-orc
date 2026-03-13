@@ -60,6 +60,14 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
+    async redirect({ url, baseUrl }) {
+      const correctBase = process.env.NEXTAUTH_URL ?? baseUrl;
+      // Rewrite any appspot.com URLs to the correct domain
+      const corrected = url.replace(/https:\/\/[^/]*\.appspot\.com/, correctBase);
+      if (corrected.startsWith(correctBase)) return corrected;
+      if (corrected.startsWith('/')) return `${correctBase}${corrected}`;
+      return correctBase;
+    },
   },
   pages: {
     signIn: '/auth/signin',
