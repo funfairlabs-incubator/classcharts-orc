@@ -32,11 +32,19 @@ export const authOptions: NextAuthOptions = {
   cookies: {
     pkceCodeVerifier: {
       name: 'next-auth.pkce.code_verifier',
-      options: { httpOnly: true, sameSite: 'none', path: '/', secure: true },
+      options: { httpOnly: true, sameSite: 'none', path: '/', secure: true, domain: '.funfairlabs.com' },
     },
     state: {
       name: 'next-auth.state',
-      options: { httpOnly: true, sameSite: 'none', path: '/', secure: true },
+      options: { httpOnly: true, sameSite: 'none', path: '/', secure: true, domain: '.funfairlabs.com' },
+    },
+    callbackUrl: {
+      name: 'next-auth.callback-url',
+      options: { httpOnly: false, sameSite: 'none', path: '/', secure: true, domain: '.funfairlabs.com' },
+    },
+    sessionToken: {
+      name: 'next-auth.session-token',
+      options: { httpOnly: true, sameSite: 'none', path: '/', secure: true, domain: '.funfairlabs.com' },
     },
   },
   callbacks: {
