@@ -18,6 +18,11 @@ import { Storage } from '@google-cloud/storage';
 import { google } from 'googleapis';
 
 const DRY_RUN = !process.argv.includes('--go');
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
+}
 const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
 
 // ── Config loaders ────────────────────────────────────────────
@@ -151,7 +156,7 @@ async function main() {
                 description: [
                   subject ? `Subject: ${subject}` : '',
                   `Due: ${dueDate}`,
-                  hw.description ?? hw.description ?? '',
+                  stripHtml(hw.description ?? ''),
                 ].filter(Boolean).join('\n'),
                 start: { date: issueDate },
                 end: { date: issueDate },
@@ -180,7 +185,7 @@ async function main() {
               notes: [
                 subject ? `Subject: ${subject}` : '',
                 `Set: ${new Date(issueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`,
-                hw.description ?? '',
+                stripHtml(hw.description ?? ''),
               ].filter(Boolean).join('\n'),
               due: `${dueDate}T00:00:00.000Z`,
               status: isComplete ? 'completed' : 'needsAction',
