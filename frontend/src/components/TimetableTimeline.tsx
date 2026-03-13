@@ -17,6 +17,7 @@ interface Props {
   lessons: Lesson[];
   href: string;
   accent: { color: string; bg: string; border: string };
+  compact?: boolean; // When true: show status banner + bar only, hide lesson list
 }
 
 function extractTime(t: string): string {
@@ -46,7 +47,7 @@ function guessBreakLabel(periodName: string, startTime: string): string {
   return 'Break';
 }
 
-export function TimetableTimeline({ lessons, href, accent }: Props) {
+export function TimetableTimeline({ lessons, href, accent, compact = false }: Props) {
   const now = new Date();
   const nowMins = now.getHours() * 60 + now.getMinutes();
 
@@ -168,48 +169,52 @@ export function TimetableTimeline({ lessons, href, accent }: Props) {
         </div>
       )}
 
-      {/* Lesson list */}
-      <div style={styles.lessonList}>
-        {allLessons.map((l, i) => {
-          if (l.isBreak) {
-            return (
-              <div key={i} style={styles.breakRow}>
-                <span style={styles.breakLabel}>{guessBreakLabel(l.periodName, l.startTime)}</span>
-                <span style={styles.breakTime}>{fmtTime(l.startTime)}–{fmtTime(l.endTime)}</span>
-              </div>
-            );
-          }
-          const isCurrent = currentSlot === l;
-          const isPast = nowMins >= timeMins(l.endTime);
-          return (
-            <div key={i} style={{
-              ...styles.lessonRow,
-              opacity: isPast ? 0.4 : 1,
-              background: isCurrent ? accent.bg : 'transparent',
-              borderLeft: isCurrent ? `3px solid ${accent.color}` : '3px solid transparent',
-              borderRadius: 4,
-            }}>
-              {isCurrent && <span style={{ ...styles.nowPill, background: accent.color }}>▶ Now</span>}
-              <span style={styles.lessonTime}>{fmtTime(l.startTime)}</span>
-              <div style={styles.lessonMeta}>
-                <span style={{ ...styles.lessonSubject, color: l.isAlternative ? '#b45309' : 'var(--text)' }}>
-                  {l.isAlternative ? '⚠ ' : ''}{l.subjectName || 'Lesson'}
-                </span>
-                <span style={styles.lessonDetail}>
-                  {l.isAlternative
-                    ? (l.pupilNote || 'Timetable may have changed — check with school')
-                    : `${l.teacherName}${l.roomName ? ` · ${l.roomName}` : ''}`
-                  }
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {!compact && (
+        <>
+          {/* Lesson list */}
+          <div style={styles.lessonList}>
+            {allLessons.map((l, i) => {
+              if (l.isBreak) {
+                return (
+                  <div key={i} style={styles.breakRow}>
+                    <span style={styles.breakLabel}>{guessBreakLabel(l.periodName, l.startTime)}</span>
+                    <span style={styles.breakTime}>{fmtTime(l.startTime)}–{fmtTime(l.endTime)}</span>
+                  </div>
+                );
+              }
+              const isCurrent = currentSlot === l;
+              const isPast = nowMins >= timeMins(l.endTime);
+              return (
+                <div key={i} style={{
+                  ...styles.lessonRow,
+                  opacity: isPast ? 0.4 : 1,
+                  background: isCurrent ? accent.bg : 'transparent',
+                  borderLeft: isCurrent ? `3px solid ${accent.color}` : '3px solid transparent',
+                  borderRadius: 4,
+                }}>
+                  {isCurrent && <span style={{ ...styles.nowPill, background: accent.color }}>▶ Now</span>}
+                  <span style={styles.lessonTime}>{fmtTime(l.startTime)}</span>
+                  <div style={styles.lessonMeta}>
+                    <span style={{ ...styles.lessonSubject, color: l.isAlternative ? '#b45309' : 'var(--text)' }}>
+                      {l.isAlternative ? '⚠ ' : ''}{l.subjectName || 'Lesson'}
+                    </span>
+                    <span style={styles.lessonDetail}>
+                      {l.isAlternative
+                        ? (l.pupilNote || 'Timetable may have changed — check with school')
+                        : `${l.teacherName}${l.roomName ? ` · ${l.roomName}` : ''}`
+                      }
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-      <div style={{ padding: '0 0 4px', textAlign: 'right' }}>
-        <Link href={href} style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>Full timetable →</Link>
-      </div>
+          <div style={{ padding: '0 0 4px', textAlign: 'right' }}>
+            <Link href={href} style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>Full timetable →</Link>
+          </div>
+        </>
+      )}
     </div>
   );
 }
