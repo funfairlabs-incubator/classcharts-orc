@@ -24,14 +24,14 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback/google`,
+          redirect_uri: 'https://classcharts.funfairlabs.com/api/auth/callback/google',
         },
       },
     }),
   ],
   cookies: {
     pkceCodeVerifier: {
-      name: 'next-auth.pkce.code_verifier',
+      name: '__Host-next-auth.pkce.code_verifier',
       options: {
         httpOnly: true,
         sameSite: 'none',
@@ -40,9 +40,27 @@ export const authOptions: NextAuthOptions = {
       },
     },
     state: {
-      name: 'next-auth.state',
+      name: '__Host-next-auth.state',
       options: {
         httpOnly: true,
+        sameSite: 'none',
+        path: '/',
+        secure: true,
+      },
+    },
+    sessionToken: {
+      name: '__Secure-next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'none',
+        path: '/',
+        secure: true,
+      },
+    },
+    callbackUrl: {
+      name: '__Secure-next-auth.callback-url',
+      options: {
+        httpOnly: false,
         sameSite: 'none',
         path: '/',
         secure: true,
