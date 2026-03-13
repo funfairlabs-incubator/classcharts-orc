@@ -170,3 +170,26 @@ export async function createCalendarEvents(
 
   return createdIds;
 }
+
+// ── Update event titles (e.g. when homework status changes) ──
+
+export async function updateCalendarEventTitles(
+  eventIds: string[],
+  newTitle: string,
+  calendarId: string,
+): Promise<void> {
+  const calendar = getCalendarClient();
+  for (const eventId of eventIds) {
+    try {
+      // Fetch current event to preserve all other fields
+      const { data: existing } = await calendar.events.get({ calendarId, eventId });
+      await calendar.events.patch({
+        calendarId,
+        eventId,
+        requestBody: { summary: newTitle },
+      });
+    } catch (err) {
+      console.error(`Failed to update calendar event ${eventId}:`, err);
+    }
+  }
+}

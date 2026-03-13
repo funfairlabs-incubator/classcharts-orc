@@ -4,7 +4,11 @@ import { getState, saveState } from './state.js';
 import { sendPushoverToKeys } from './pushover.js';
 import { formatHomework, formatHomeworkOverdue, formatHomeworkStatusChange, formatActivity, formatAnnouncement, formatAttendance, formatDetention } from './formatter.js';
 import { analyseAnnouncement, summariseHomework, summariseActivity } from './claude.js';
-import { ensureCalendarsExist, createCalendarEvents } from './calendar.js';
+import { ensureCalendarsExist, createCalendarEvents, updateCalendarEventTitles } from './calendar.js';
+
+async function updateHomeworkCalendarEvents(eventIds: string[], newTitle: string, config: { familyCalendarId: string; studentCalendars: Record<number, string> }) {
+  await updateCalendarEventTitles(eventIds, newTitle, config.familyCalendarId);
+}
 import { getEnabledKeys } from './prefs.js';
 import { archiveAnnouncement, downloadAndSaveAttachments } from './archive.js';
 
@@ -66,17 +70,23 @@ export async function pollClassCharts(): Promise<void> {
                 try {
                   const dueDate = hw.dueDate.split('T')[0]; // ensure YYYY-MM-DD
                   const calEvent = {
-                    title: hw.title,
+                    title: `📚 ${hw.title}`,
                     date: dueDate,
                     allDay: true,
                     description: [
-                      hw.subjectName ? `Subject: ${hw.subjectName}` : '',
-                      summary ? summary : '',
+                      hw.subject ? `Subject: ${hw.subject}` : '',
+                      summary ?? '',
                     ].filter(Boolean).join('\n'),
                     eventType: 'homework' as const,
                     studentId: pupil.id,
                   };
-                  await createCalendarEvents([calEvent], calendarConfig);
+                  const createdIds = await createCalendarEvents([calEvent], calendarConfig);
+                  // Store calendar event IDs so we can update them on status change
+                  if (createdIds.length > 0) {
+                    const calMap: Record<number, string[]> = (state as any).homeworkCalendarIds ?? {};
+                    calMap[hw.id] = createdIds;
+                    (state as any).homeworkCalendarIds = calMap;
+                  }
                   console.log(`  Added homework to calendar: "${hw.title}" due ${dueDate}`);
                 } catch (calErr) {
                   console.error(`  Calendar write failed for homework ${hw.id}:`, calErr);
@@ -112,10 +122,24 @@ export async function pollClassCharts(): Promise<void> {
           });
           if (statusChanges.length > 0) {
             const keys = await getEnabledKeys('homeworkStatusChange');
+            const calMap: Record<number, string[]> = (state as any).homeworkCalendarIds ?? {};
             for (const hw of statusChanges) {
               const prev = knownStatuses[hw.id];
               const curr = hw.status ?? (hw.ticked ? 'ticked' : 'pending');
               await sendPushoverToKeys(keys, formatHomeworkStatusChange(hw, pupil.name, prev, curr));
+
+              // Update the calendar event title to reflect new status
+              if (calendarConfig && calMap[hw.id]?.length) {
+                try {
+                  const isComplete = curr === 'completed' || curr === 'ticked';
+                  const isLate = curr === 'late';
+                  const prefix = isComplete ? '✅' : isLate ? '⚠️' : '📚';
+                  await updateHomeworkCalendarEvents(calMap[hw.id], `${prefix} ${hw.title}`, calendarConfig);
+                  console.log(`  Updated calendar event for "${hw.title}": ${prev} → ${curr}`);
+                } catch (calErr) {
+                  console.error(`  Calendar update failed for homework ${hw.id}:`, calErr);
+                }
+              }
             }
             changed = true;
           }
