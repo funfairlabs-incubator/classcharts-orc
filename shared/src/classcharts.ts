@@ -219,6 +219,14 @@ export class ClassChartsParentClient {
     this.client.selectPupil(pupilId);
   }
 
+  getAuthHeaders(): Record<string, string> {
+    const c = this.client as any;
+    return {
+      Cookie: (c.authCookies ?? []).join(';'),
+      Authorization: `Basic ${c.sessionId ?? ''}`,
+    };
+  }
+
   getPupils(): CCStudent[] {
     return this.pupils;
   }

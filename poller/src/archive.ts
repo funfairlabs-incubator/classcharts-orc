@@ -36,6 +36,7 @@ export interface SavedAttachment {
 export async function downloadAndSaveAttachments(
   ann: CCAnnouncement,
   studentId: number,
+  authHeaders: Record<string, string>,
 ): Promise<SavedAttachment[]> {
   const saved: SavedAttachment[] = [];
 
@@ -62,11 +63,15 @@ export async function downloadAndSaveAttachments(
 
     try {
       console.log(`  Downloading attachment: ${filename}`);
-      const res = await fetch(att.url);
+      const res = await fetch(att.url, { headers: authHeaders });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      const buffer = Buffer.from(await res.arrayBuffer());
       const contentType = res.headers.get('content-type') ?? guessContentType(filename);
+      // Guard: if we got an HTML response, auth failed — don't save a login page
+      if (contentType.includes('text/html')) {
+        throw new Error(`Auth redirect received for ${filename} — attachment URL requires valid session`);
+      }
+      const buffer = Buffer.from(await res.arrayBuffer());
 
       await file.save(buffer, { contentType, resumable: false });
 
