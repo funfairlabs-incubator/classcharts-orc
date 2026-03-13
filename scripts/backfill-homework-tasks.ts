@@ -63,7 +63,7 @@ async function getHomework(from: string, to: string) {
 
     const client = new ParentClient(email, password);
     await client.login();
-    const { data: pupils } = await client.getPupils();
+    const pupils = await client.getPupils();
 
     for (const pupil of pupils) {
       if (seenIds.has(pupil.id)) continue;
