@@ -115,9 +115,11 @@ export async function pollClassCharts(): Promise<void> {
       if (pupil.displayAnnouncements) {
         try {
           const announcements = await client.getAnnouncements();
+          console.log(`  Announcements: ${announcements.length} total, lastSeen=${state.lastAnnouncementId}, ids=[${announcements.map(a=>a.id).join(',')}]`);
           const newAnnouncements = announcements.filter(a => a.id > state.lastAnnouncementId);
           if (newAnnouncements.length > 0) {
             const keys = await getEnabledKeys('announcements');
+            console.log(`  New announcements: ${newAnnouncements.length}, pushover keys: ${keys.length}`);
             for (const ann of newAnnouncements) {
               // Archive to Firestore + download attachments to GCS
               await archiveAnnouncement(ann, pupil.id, pupil.name);
