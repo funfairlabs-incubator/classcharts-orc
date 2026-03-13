@@ -7,7 +7,8 @@
     "backfill-calendar:dry": "ts-node backfill-calendar.ts --dry-run",
     "reset-announcements": "npx ts-node reset-announcement-state.ts",
     "backfill-attachments": "npx ts-node backfill-attachments.ts",
-    "backfill-gcs-paths": "npx ts-node backfill-gcs-paths.ts"
+    "backfill-gcs-paths": "npx ts-node backfill-gcs-paths.ts",
+    "backfill-homework-calendar": "npx ts-node backfill-homework-calendar.ts"
   },
   "dependencies": {
     "@google-cloud/firestore": "^7.0.0",
