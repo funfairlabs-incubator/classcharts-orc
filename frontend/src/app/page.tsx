@@ -66,7 +66,7 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
   const nowMins = now.getHours() * 60 + now.getMinutes();
   const behavScore = (behaviour?.activity ?? []).reduce((s, p) => s + p.score, 0);
   const overdueHw = (homeworkData ?? []).filter(h => new Date(h.dueDate) < now && h.status !== 'completed' && !h.ticked);
-  const todoHw = (homeworkData ?? []).filter(h => h.status !== 'completed' && !h.ticked && new Date(h.dueDate) >= now);
+  const todoHw = (homeworkData ?? []).filter(h => (h.status === 'not_completed' || h.status === null) && !h.ticked && new Date(h.dueDate) >= now);
   const attendPct = attendance ? parseFloat(attendance.overallPercentage) : null;
   const pinnedAnn = (announcements ?? []).find(a => (a as any).isPinned) ?? null;
   const latestAnn = (announcements ?? []).find(a => !(a as any).isPinned) ?? null;

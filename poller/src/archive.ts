@@ -102,6 +102,17 @@ export async function downloadAndSaveAttachments(
     }
   }
 
+  // Write gcsPath map back onto the announcement document so the frontend can serve them
+  if (saved.length > 0) {
+    const pathMap: Record<string, string> = {};
+    for (const s of saved) pathMap[s.filename] = s.gcsPath;
+    const docId = `${studentId}_${ann.id}`;
+    await db.collection('announcements').doc(docId).update({
+      attachmentGcsPaths: pathMap,
+    });
+    console.log(`  Updated announcement ${ann.id} with ${Object.keys(pathMap).length} GCS path(s)`);
+  }
+
   return saved;
 }
 
