@@ -14,10 +14,15 @@ export default function HomeworkPage() {
   );
 
   const twoDaysAgo = Date.now() - 2 * 86400000;
+  const sortByIssueDesc = (a: CCHomework, b: CCHomework) =>
+    new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime();
+  const sortByDueAsc = (a: CCHomework, b: CCHomework) =>
+    new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+
   const grouped = {
-    late:      (homework ?? []).filter(h => h.status === 'late'),
-    todo:      (homework ?? []).filter(h => h.status === 'not_completed' && !h.ticked),
-    completed: (homework ?? []).filter(h => h.status === 'completed' || h.ticked),
+    late:      [...(homework ?? []).filter(h => h.status === 'late')].sort(sortByDueAsc),
+    todo:      [...(homework ?? []).filter(h => h.status === 'not_completed' && !h.ticked)].sort(sortByDueAsc),
+    completed: [...(homework ?? []).filter(h => h.status === 'completed' || h.ticked)].sort(sortByIssueDesc),
   };
   const isNew = (h: CCHomework) => new Date(h.issueDate).getTime() > twoDaysAgo;
 
@@ -61,8 +66,11 @@ function Group({ title, items, muted, emptyMessage, isNew }: {
         <div className="card" style={{ overflow: 'hidden' }}>
           {items.map((hw, i) => {
             const daysLeft = Math.ceil((new Date(hw.dueDate).getTime() - Date.now()) / 86400000);
-            const urgency = hw.status === 'late' ? 'var(--negative)' :
-              daysLeft <= 1 ? 'var(--warning)' : daysLeft <= 3 ? 'var(--info)' : 'var(--border)';
+            // Explicit colours — CSS vars for these are both dark brown, visually too similar at stripe width
+            const urgency = hw.status === 'late' ? '#dc2626'   // red — overdue
+              : daysLeft <= 1 ? '#ea580c'                       // orange — due tomorrow
+              : daysLeft <= 3 ? '#d97706'                       // amber — due soon
+              : 'var(--border)';                                 // grey — fine
 
             return (
               <div key={hw.id} style={{ ...styles.row, borderBottom: i < items.length - 1 ? '1px solid var(--border)' : 'none' }}>
@@ -85,7 +93,7 @@ function Group({ title, items, muted, emptyMessage, isNew }: {
                       <span style={styles.dateItem}>Set {formatDate(hw.issueDate)}</span>
                       <span style={{
                         ...styles.dateItem,
-                        color: hw.status === 'late' ? 'var(--negative)' : urgency !== 'var(--border)' ? urgency : 'var(--text-3)',
+                        color: hw.status === 'late' ? '#dc2626' : urgency !== 'var(--border)' ? urgency : 'var(--text-3)',
                         fontWeight: daysLeft <= 3 ? 600 : 400,
                       }}>
                         {hw.status === 'late' ? '⚠ Overdue' : `Due ${formatDate(hw.dueDate)}`}

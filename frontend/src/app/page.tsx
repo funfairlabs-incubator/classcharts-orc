@@ -29,7 +29,7 @@ export default function OverviewPage() {
       <PageHeader />
       <div style={styles.grid}>
         {pupils.map((pupil, i) => (
-          <StudentCard key={pupil.id} pupil={pupil} accent={STUDENT_ACCENTS[i % STUDENT_ACCENTS.length]} defaultExpanded={i === 0} />
+          <StudentCard key={pupil.id} pupil={pupil} accent={STUDENT_ACCENTS[i % STUDENT_ACCENTS.length]} />
         ))}
       </div>
     </div>
@@ -105,10 +105,7 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
           </div>
           <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
             <h2 style={styles.studentName}>{pupil.firstName} {pupil.lastName}</h2>
-            {!expanded
-              ? <NowSummary lessons={lessons ?? []} accent={accent} />
-              : <p style={styles.schoolName}>{pupil.schoolName}</p>
-            }
+            <p style={styles.schoolName}>{pupil.schoolName}</p>
           </div>
           <span style={{ fontSize: 10, color: accent.color, opacity: 0.6, flexShrink: 0, marginRight: 4 }}>
             {expanded ? '▲' : '▼'}
@@ -141,21 +138,15 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
         </div>
       )}
 
-      {expanded && (
-        <>
-          <hr style={styles.rule} />
-          <div style={styles.section}>
-            <div style={styles.sectionHead}>
-              <span style={{ ...styles.sectionTitle, color: accent.color }}>Today's Timetable</span>
-            </div>
-            <TimetableTimeline
-              lessons={lessons ?? []}
-              href={`/timetable?pupil=${pupil.id}`}
-              accent={accent}
-            />
-          </div>
-        </>
-      )}
+      {/* Timetable status + bar: always visible. Full lesson list: only when expanded */}
+      <div style={{ padding: '0 20px' }}>
+        <TimetableTimeline
+          lessons={lessons ?? []}
+          href={`/timetable?pupil=${pupil.id}`}
+          accent={accent}
+          compact={!expanded}
+        />
+      </div>
 
       {expanded && nextEvents.length > 0 && (
         <>
