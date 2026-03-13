@@ -52,9 +52,8 @@ function getAuth() {
 // ── ClassCharts client (inline, no shared dep path issues) ────
 
 async function getHomework(from: string, to: string) {
-  // Use the shared package directly
-  const { ParentClient } = await import('../shared/src/classcharts.js');
-  const client = new ParentClient(
+  const { ClassChartsParentClient } = await import('../shared/src/classcharts.js');
+  const client = new ClassChartsParentClient(
     process.env.CLASSCHARTS_PARENT1_EMAIL!,
     process.env.CLASSCHARTS_PARENT1_PASSWORD!,
   );

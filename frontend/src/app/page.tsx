@@ -112,6 +112,14 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
           </span>
         </button>
 
+        {/* Pinned announcement — compact chip, right of name */}
+        {pinnedAnn && (
+          <Link href={`/announcements?pupil=${pupil.id}`} style={{ ...styles.pinnedAnn, borderColor: accent.border, background: accent.bg }}>
+            <span style={{ fontSize: 11, flexShrink: 0 }}>📌</span>
+            <p style={{ fontSize: 11, fontWeight: 600, color: accent.color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>{pinnedAnn.title}</p>
+          </Link>
+        )}
+
         {/* Traffic light — separate, always visible */}
         {attendPct !== null && (
           <Link href={`/attendance?pupil=${pupil.id}`} style={styles.trafficWrap}>
@@ -210,16 +218,7 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
         )}
       </div>
 
-      {/* Pinned announcement — shown below stats, outside the grid */}
-      {pinnedAnn && (
-        <Link href={`/announcements?pupil=${pupil.id}`} style={{ ...styles.pinnedAnn, borderColor: accent.border, background: accent.bg }}>
-          <span style={{ fontSize: 12, marginRight: 6 }}>📌</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: 12, fontWeight: 600, color: accent.color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pinnedAnn.title}</p>
-            <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{pinnedAnn.teacherName}</p>
-          </div>
-        </Link>
-      )}
+
     </div>
   );
 }
@@ -388,7 +387,7 @@ const styles: Record<string, React.CSSProperties> = {
   statSub: { fontSize: 11, color: 'var(--text-2)', fontWeight: 500 },
   annPreview: { fontSize: 12, fontWeight: 500, textAlign: 'center', lineHeight: 1.3, maxWidth: 120, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' },
   empty: { fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
-  pinnedAnn: { display: 'flex', alignItems: 'flex-start', gap: 4, margin: '12px 0 0', padding: '10px 14px', borderRadius: 8, border: '1px solid', textDecoration: 'none', transition: 'opacity 0.15s' },
+  pinnedAnn: { display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 6, border: '1px solid', textDecoration: 'none', maxWidth: 160, overflow: 'hidden', flexShrink: 0 },
   cardToggle: { display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, transition: 'opacity 0.15s' },
   eventList: { display: 'flex', flexDirection: 'column', gap: 8 },
   eventRow: { display: 'flex', alignItems: 'flex-start', gap: 10 },
