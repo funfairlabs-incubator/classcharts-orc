@@ -1,4 +1,8 @@
 import { Firestore } from '@google-cloud/firestore';
+import { execSync } from 'child_process';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { Storage } from '@google-cloud/storage';
 import type { CCAnnouncement } from '@classcharts/shared';
 
@@ -71,15 +75,29 @@ export async function downloadAndSaveAttachments(
       if (contentType.includes('text/html')) {
         throw new Error(`Auth redirect received for ${filename} — attachment URL requires valid session`);
       }
-      const buffer = Buffer.from(await res.arrayBuffer());
+      let buffer = Buffer.from(await res.arrayBuffer());
+      let saveFilename = filename;
+      let saveContentType = contentType;
+      let saveGcsPath = gcsPath;
 
-      await file.save(buffer, { contentType, resumable: false });
+      // Convert office docs to PDF
+      const converted = convertToPdf(buffer, filename);
+      if (converted) {
+        console.log(`  Converted ${filename} → ${converted.filename}`);
+        buffer = converted.buffer;
+        saveFilename = converted.filename;
+        saveContentType = 'application/pdf';
+        saveGcsPath = `attachments/${studentId}/${ann.id}/${saveFilename}`;
+      }
+
+      const saveFile = storage.bucket(BUCKET).file(saveGcsPath);
+      await saveFile.save(buffer, { contentType: saveContentType, resumable: false });
 
       const savedAtt: SavedAttachment = {
-        filename,
-        gcsPath,
+        filename: saveFilename,
+        gcsPath: saveGcsPath,
         originalUrl: att.url,
-        contentType,
+        contentType: saveContentType,
         size: buffer.length,
         savedAt: new Date().toISOString(),
       };
@@ -105,7 +123,7 @@ export async function downloadAndSaveAttachments(
   // Write gcsPath map back onto the announcement document so the frontend can serve them
   if (saved.length > 0) {
     const pathMap: Record<string, string> = {};
-    for (const s of saved) pathMap[s.filename] = s.gcsPath;
+    for (const s of saved) pathMap[s.filename] = s.gcsPath; // filename here is the converted name
     const docId = `${studentId}_${ann.id}`;
     await db.collection('announcements').doc(docId).update({
       attachmentGcsPaths: pathMap,
@@ -114,6 +132,34 @@ export async function downloadAndSaveAttachments(
   }
 
   return saved;
+}
+
+// Convert docx/doc/pptx/xlsx to PDF using LibreOffice
+function convertToPdf(buffer: Buffer, filename: string): { buffer: Buffer; filename: string } | null {
+  const CONVERTIBLE = ['doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'];
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  if (!CONVERTIBLE.includes(ext)) return null;
+
+  try {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-'));
+    const inPath = path.join(tmpDir, filename);
+    const pdfFilename = filename.replace(/\.[^.]+$/, '.pdf');
+    const outPath = path.join(tmpDir, pdfFilename);
+
+    fs.writeFileSync(inPath, buffer);
+    execSync(`libreoffice --headless --convert-to pdf --outdir "${tmpDir}" "${inPath}"`, {
+      timeout: 30000,
+      stdio: 'pipe',
+    });
+
+    if (!fs.existsSync(outPath)) return null;
+    const pdfBuffer = fs.readFileSync(outPath);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    return { buffer: pdfBuffer, filename: pdfFilename };
+  } catch (err) {
+    console.error(`  PDF conversion failed for ${filename}:`, err);
+    return null;
+  }
 }
 
 function guessContentType(filename: string): string {
