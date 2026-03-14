@@ -106,13 +106,17 @@ function AnnouncementCard({ ann, index }: { ann: AnnItem; index: number }) {
           {ann.attachments.map((att, ai) => {
             const gcsPaths = ann.attachmentGcsPaths ?? {};
             const gcsPath = gcsPaths[att.filename];
-            const href = gcsPath
-              ? `/api/attachments/${gcsPath}`
-              : att.url;
+            // If no GCS copy, the original ClassCharts URL will be expired — show as unavailable
+            if (!gcsPath) return (
+              <span key={ai} style={{...styles.attachment, opacity: 0.4, cursor: 'not-allowed'}} title="Attachment not yet archived">
+                {fileIcon(att.filename)} {att.filename} <span style={styles.archivedBadge}>pending</span>
+              </span>
+            );
+            const href = `/api/attachments/${gcsPath}`;
             return (
               <a key={ai} href={href} target="_blank" rel="noreferrer" style={styles.attachment}>
                 {fileIcon(att.filename)} {att.filename}
-                {gcsPath && <span style={styles.archivedBadge}>archived</span>}
+                <span style={styles.archivedBadge}>archived</span>
               </a>
             );
           })}

@@ -14,6 +14,9 @@ RUN cd poller && npm install && npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
+# LibreOffice for docx→pdf conversion
+RUN apk add --no-cache libreoffice font-noto && fc-cache -f
+
 COPY --from=builder /app/shared/dist ./shared/dist
 COPY --from=builder /app/shared/package.json ./shared/package.json
 COPY --from=builder /app/shared/node_modules ./shared/node_modules
