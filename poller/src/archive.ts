@@ -135,7 +135,7 @@ export async function downloadAndSaveAttachments(
 }
 
 // Convert docx/doc/pptx/xlsx to PDF using LibreOffice
-function convertToPdf(buffer: Buffer, filename: string): { buffer: Buffer; filename: string } | null {
+function convertToPdf(buffer: Buffer<ArrayBuffer>, filename: string): { buffer: Buffer<ArrayBuffer>; filename: string } | null {
   const CONVERTIBLE = ['doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'];
   const ext = filename.split('.').pop()?.toLowerCase() ?? '';
   if (!CONVERTIBLE.includes(ext)) return null;
@@ -153,7 +153,7 @@ function convertToPdf(buffer: Buffer, filename: string): { buffer: Buffer; filen
     });
 
     if (!fs.existsSync(outPath)) return null;
-    const pdfBuffer = fs.readFileSync(outPath);
+    const pdfBuffer = Buffer.from(fs.readFileSync(outPath)) as Buffer<ArrayBuffer>;
     fs.rmSync(tmpDir, { recursive: true, force: true });
     return { buffer: pdfBuffer, filename: pdfFilename };
   } catch (err) {
