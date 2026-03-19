@@ -75,7 +75,7 @@ export async function downloadAndSaveAttachments(
       if (contentType.includes('text/html')) {
         throw new Error(`Auth redirect received for ${filename} — attachment URL requires valid session`);
       }
-      let buffer = Buffer.from(await res.arrayBuffer());
+      let buffer = Buffer.from(await res.arrayBuffer() as ArrayBuffer);
       let saveFilename = filename;
       let saveContentType = contentType;
       let saveGcsPath = gcsPath;
