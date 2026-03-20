@@ -25,15 +25,17 @@ export function formatActivity(
   studentName: string,
   summary: string,
 ): PushoverMessage {
-  const isPositive = point.polarity === 'positive';
+  const isPositive = point.score > 0;
+  const isNeutral  = point.score === 0;
   const scoreStr = point.score > 0 ? `+${point.score}` : String(point.score);
   const lesson = point.lessonName ? ` · ${point.lessonName}` : '';
   const teacher = point.teacherName ? ` · ${point.teacherName}` : '';
 
+  const icon = isPositive ? '✅' : isNeutral ? 'ℹ️' : '❌';
+  const label = isPositive ? 'Award' : isNeutral ? 'Note' : 'Behaviour';
+
   return {
-    title: isPositive
-      ? `⭐ Award (${scoreStr}) — ${studentName}`
-      : `⚠️ Behaviour (${scoreStr}) — ${studentName}`,
+    title: `${icon} ${label} (${scoreStr}) — ${studentName}`,
     message: `${summary}${lesson}${teacher}`,
     priority: isPositive ? -1 : point.score <= -3 ? 1 : 0,
   };
