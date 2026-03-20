@@ -75,6 +75,21 @@ echo ""
 echo "Next steps:"
 echo "  1. Deploy poller: cd .. && gcloud run deploy classcharts-poller --source . --file Dockerfile.poller --region $REGION --service-account $SA_EMAIL"
 echo "  2. Create Pub/Sub push subscription pointing to your Cloud Run URL"
+
+# ── Pub/Sub push subscription ──────────────────────────────────
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
+POLLER_URL="https://classcharts-poller-${PROJECT_NUMBER}.europe-west2.run.app/"
+echo "▶ Creating Pub/Sub push subscription..."
+gcloud pubsub subscriptions create classcharts-poller-sub \
+  --topic=classcharts-poll \
+  --push-endpoint="$POLLER_URL" \
+  --push-auth-service-account="service-${PROJECT_NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com" \
+  --project="$PROJECT_ID" \
+  2>/dev/null || gcloud pubsub subscriptions modify-push-config classcharts-poller-sub \
+  --push-endpoint="$POLLER_URL" \
+  --push-auth-service-account="service-${PROJECT_NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com" \
+  --project="$PROJECT_ID"
+echo "✅ Pub/Sub subscription configured with OIDC auth"
 echo "  3. Deploy frontend: cd frontend && gcloud app deploy"
 echo "  4. Set env vars/secrets via Secret Manager"
 
