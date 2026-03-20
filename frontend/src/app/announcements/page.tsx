@@ -16,7 +16,7 @@ export default function AnnouncementsPage() {
   const consentPending = (announcements ?? []).filter(a => a.requiresConsent && a.consentGiven === null);
 
   return (
-    <div>
+    <div style={styles.page}>
       <div style={{ marginBottom: 24 }}>
         <p style={styles.eyebrow}>School</p>
         <h1 style={styles.pageTitle}>Announcements</h1>
@@ -148,6 +148,7 @@ function formatDate(ts: string) {
 }
 
 const styles: Record<string, React.CSSProperties> = {
+  page: { maxWidth: 640, margin: '0 auto', padding: '24px 16px 48px' },
   eyebrow: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 },
   pageTitle: { fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 500 },
   rule: { border: 'none', borderTop: '1px solid var(--border)', marginBottom: 24 },
