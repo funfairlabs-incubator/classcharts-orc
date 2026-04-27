@@ -1,0 +1,1127 @@
+From 63f6374ea8e0cf6060e3407e167adc67cc3e7a2b Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Tue, 10 Mar 2026 18:50:04 +0000
+Subject: [PATCH] feat: initial project scaffold
+
+- shared/: ClassCharts API client + TypeScript types
+- poller/: Cloud Run service (Pub/Sub triggered)
+  - ClassCharts API polling with Firestore state diffing
+  - Gmail watching for ClassCharts emails
+  - Pushover notifications (dual recipient)
+  - Notification formatter with priority levels
+- frontend/: Next.js skeleton
+  - Google OAuth via NextAuth
+  - GCS-backed allowed users list
+  - Admin API routes for user management
+  - GAE app.yaml (F1, scales to zero)
+- infra/: GCP setup + deploy scripts (europe-west2)
+- Dockerfile.poller for Cloud Run
+- .env.example with all required vars
+---
+ .env.example                                  |  35 ++++++
+ .gitignore                                    |   7 ++
+ Dockerfile.poller                             |  26 ++++
+ README.md                                     |  39 +++++-
+ frontend/app.yaml                             |  19 +++
+ frontend/package.json                         |  28 +++++
+ frontend/src/app/api/admin/users/route.ts     |  88 ++++++++++++++
+ .../src/app/api/auth/[...nextauth]/route.ts   |  54 +++++++++
+ infra/deploy-poller.sh                        |  44 +++++++
+ infra/setup.sh                                |  77 ++++++++++++
+ poller/package.json                           |  22 ++++
+ poller/src/formatter.ts                       |  45 +++++++
+ poller/src/gmail.ts                           |  61 ++++++++++
+ poller/src/index.ts                           |  29 +++++
+ poller/src/poller.ts                          | 113 ++++++++++++++++++
+ poller/src/pushover.ts                        |  26 ++++
+ poller/tsconfig.json                          |  14 +++
+ shared/package.json                           |  18 +++
+ shared/src/classcharts.ts                     |  70 +++++++++++
+ shared/src/index.ts                           |   2 +
+ shared/src/types.ts                           |  95 +++++++++++++++
+ shared/tsconfig.json                          |  16 +++
+ 22 files changed, 927 insertions(+), 1 deletion(-)
+ create mode 100644 .env.example
+ create mode 100644 .gitignore
+ create mode 100644 Dockerfile.poller
+ create mode 100644 frontend/app.yaml
+ create mode 100644 frontend/package.json
+ create mode 100644 frontend/src/app/api/admin/users/route.ts
+ create mode 100644 frontend/src/app/api/auth/[...nextauth]/route.ts
+ create mode 100644 infra/deploy-poller.sh
+ create mode 100644 infra/setup.sh
+ create mode 100644 poller/package.json
+ create mode 100644 poller/src/formatter.ts
+ create mode 100644 poller/src/gmail.ts
+ create mode 100644 poller/src/index.ts
+ create mode 100644 poller/src/poller.ts
+ create mode 100644 poller/src/pushover.ts
+ create mode 100644 poller/tsconfig.json
+ create mode 100644 shared/package.json
+ create mode 100644 shared/src/classcharts.ts
+ create mode 100644 shared/src/index.ts
+ create mode 100644 shared/src/types.ts
+ create mode 100644 shared/tsconfig.json
+
+diff --git a/.env.example b/.env.example
+new file mode 100644
+index 0000000..9ef65d7
+--- /dev/null
++++ b/.env.example
+@@ -0,0 +1,35 @@
++# ── ClassCharts ──────────────────────────────────────────────
++CLASSCHARTS_PARENT1_EMAIL=parent@example.com
++CLASSCHARTS_PARENT1_CODE=ACCESS_CODE_HERE
++# Add second parent if needed:
++# CLASSCHARTS_PARENT2_EMAIL=partner@example.com
++# CLASSCHARTS_PARENT2_CODE=ACCESS_CODE_HERE
++
++# ── GCP ──────────────────────────────────────────────────────
++GCP_PROJECT_ID=your-project-id
++GCS_BUCKET=your-classcharts-bucket
++GCS_ALLOWED_USERS_PATH=config/allowed-users.json
++
++# ── Google OAuth (NextAuth) ───────────────────────────────────
++GOOGLE_CLIENT_ID=
++GOOGLE_CLIENT_SECRET=
++NEXTAUTH_URL=https://your-app.appspot.com
++NEXTAUTH_SECRET=generate-with-openssl-rand-base64-32
++
++# ── Admin ─────────────────────────────────────────────────────
++# Your GitHub-linked Gmail — has sudo access
++ADMIN_EMAIL=you@gmail.com
++
++# ── Pushover ──────────────────────────────────────────────────
++PUSHOVER_API_TOKEN=
++PUSHOVER_USER_KEY=
++# Optional second recipient (partner):
++# PUSHOVER_USER_KEY_2=
++
++# ── Gmail API (for email watching) ───────────────────────────
++GMAIL_CLIENT_ID=
++GMAIL_CLIENT_SECRET=
++GMAIL_REFRESH_TOKEN=
++
++# ── Poller ────────────────────────────────────────────────────
++POLL_INTERVAL_MINUTES=5
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..a92ef2d
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,7 @@
++node_modules/
++dist/
++.next/
++.env
++.env.local
++*.log
++.DS_Store
+diff --git a/Dockerfile.poller b/Dockerfile.poller
+new file mode 100644
+index 0000000..28ec665
+--- /dev/null
++++ b/Dockerfile.poller
+@@ -0,0 +1,26 @@
++FROM node:20-alpine AS builder
++WORKDIR /app
++
++# Build shared package first
++COPY shared/package.json shared/tsconfig.json ./shared/
++COPY shared/src ./shared/src
++RUN cd shared && npm install && npm run build
++
++# Build poller
++COPY poller/package.json poller/tsconfig.json ./poller/
++COPY poller/src ./poller/src
++RUN cd poller && npm install && npm run build
++
++FROM node:20-alpine AS runner
++WORKDIR /app
++
++COPY --from=builder /app/shared/dist ./shared/dist
++COPY --from=builder /app/shared/package.json ./shared/package.json
++COPY --from=builder /app/poller/dist ./poller/dist
++COPY --from=builder /app/poller/node_modules ./poller/node_modules
++COPY --from=builder /app/poller/package.json ./poller/package.json
++
++ENV NODE_ENV=production
++EXPOSE 8080
++
++CMD ["node", "poller/dist/index.js"]
+diff --git a/README.md b/README.md
+index 5d56b53..0363b0a 100644
+--- a/README.md
++++ b/README.md
+@@ -1 +1,38 @@
+-# classcharts-orc
+\ No newline at end of file
++# ClassCharts Parent Dashboard
++
++A self-hosted parent dashboard for ClassCharts with Pushover notifications.
++
++## Structure
++
++```
++classcharts-parent/
++├── frontend/        # Next.js app — GAE deployment
++├── poller/          # Cloud Run service — Pub/Sub triggered
++├── shared/          # Shared types and ClassCharts API client
++└── infra/           # GCP setup scripts and Terraform (optional)
++```
++
++## Quick Start
++
++### Prerequisites
++- Node.js 20+
++- GCP project with billing enabled
++- ClassCharts parent account(s)
++- Pushover app + user keys
++- Google OAuth credentials
++
++### Setup
++1. `cp .env.example .env` and fill in values
++2. `cd shared && npm install && npm run build`
++3. `cd frontend && npm install && npm run dev`
++4. `cd poller && npm install`
++
++## Environment Variables
++
++See `.env.example` for all required variables.
++
++## Deployment
++
++- **Frontend**: `gcloud app deploy` from `frontend/`
++- **Poller**: `gcloud run deploy` from `poller/`
++- **Infra**: See `infra/setup.sh` for GCP resource creation
+diff --git a/frontend/app.yaml b/frontend/app.yaml
+new file mode 100644
+index 0000000..61c4240
+--- /dev/null
++++ b/frontend/app.yaml
+@@ -0,0 +1,19 @@
++runtime: nodejs20
++service: default
++
++instance_class: F1  # Smallest instance — keeps costs minimal
++
++automatic_scaling:
++  min_instances: 0
++  max_instances: 2
++  target_cpu_utilization: 0.65
++
++env_variables:
++  NODE_ENV: production
++  # All secrets should be injected via Secret Manager in production
++  # Set these via: gcloud app deploy --set-env-vars or use Secret Manager
++
++handlers:
++  - url: /.*
++    script: auto
++    secure: always
+diff --git a/frontend/package.json b/frontend/package.json
+new file mode 100644
+index 0000000..f735443
+--- /dev/null
++++ b/frontend/package.json
+@@ -0,0 +1,28 @@
++{
++  "name": "classcharts-frontend",
++  "version": "1.0.0",
++  "private": true,
++  "scripts": {
++    "dev": "next dev",
++    "build": "next build",
++    "start": "next start",
++    "lint": "next lint"
++  },
++  "dependencies": {
++    "@classcharts/shared": "file:../shared",
++    "@google-cloud/storage": "^7.11.0",
++    "next": "^14.2.0",
++    "next-auth": "^4.24.0",
++    "react": "^18.3.0",
++    "react-dom": "^18.3.0"
++  },
++  "devDependencies": {
++    "typescript": "^5.4.0",
++    "@types/node": "^20.0.0",
++    "@types/react": "^18.3.0",
++    "@types/react-dom": "^18.3.0",
++    "tailwindcss": "^3.4.0",
++    "autoprefixer": "^10.4.0",
++    "postcss": "^8.4.0"
++  }
++}
+diff --git a/frontend/src/app/api/admin/users/route.ts b/frontend/src/app/api/admin/users/route.ts
+new file mode 100644
+index 0000000..011215a
+--- /dev/null
++++ b/frontend/src/app/api/admin/users/route.ts
+@@ -0,0 +1,88 @@
++import { NextRequest, NextResponse } from 'next/server';
++import { getServerSession } from 'next-auth';
++import { authOptions } from '../auth/[...nextauth]/route';
++import { Storage } from '@google-cloud/storage';
++import type { AllowedUsersConfig, AllowedUser } from '@classcharts/shared';
++
++const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
++
++function getFile() {
++  return storage
++    .bucket(process.env.GCS_BUCKET!)
++    .file(process.env.GCS_ALLOWED_USERS_PATH!);
++}
++
++async function readConfig(): Promise<AllowedUsersConfig> {
++  try {
++    const [content] = await getFile().download();
++    return JSON.parse(content.toString());
++  } catch {
++    return { users: [] };
++  }
++}
++
++async function writeConfig(config: AllowedUsersConfig): Promise<void> {
++  await getFile().save(JSON.stringify(config, null, 2), {
++    contentType: 'application/json',
++  });
++}
++
++function requireAdmin(session: any) {
++  if (!session?.user?.isAdmin) {
++    throw new Error('Forbidden');
++  }
++}
++
++// GET /api/admin/users
++export async function GET() {
++  const session = await getServerSession(authOptions);
++  try {
++    requireAdmin(session);
++    const config = await readConfig();
++    return NextResponse.json(config.users);
++  } catch {
++    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
++  }
++}
++
++// POST /api/admin/users — add a user
++export async function POST(req: NextRequest) {
++  const session = await getServerSession(authOptions);
++  try {
++    requireAdmin(session);
++    const { email, name } = await req.json();
++    if (!email) return NextResponse.json({ error: 'Email required' }, { status: 400 });
++
++    const config = await readConfig();
++    const exists = config.users.some(u => u.email.toLowerCase() === email.toLowerCase());
++    if (exists) return NextResponse.json({ error: 'User already exists' }, { status: 409 });
++
++    const newUser: AllowedUser = {
++      email: email.toLowerCase(),
++      name,
++      addedBy: session!.user!.email!,
++      addedAt: new Date().toISOString(),
++    };
++    config.users.push(newUser);
++    await writeConfig(config);
++
++    return NextResponse.json(newUser, { status: 201 });
++  } catch {
++    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
++  }
++}
++
++// DELETE /api/admin/users — remove a user
++export async function DELETE(req: NextRequest) {
++  const session = await getServerSession(authOptions);
++  try {
++    requireAdmin(session);
++    const { email } = await req.json();
++    const config = await readConfig();
++    config.users = config.users.filter(u => u.email.toLowerCase() !== email.toLowerCase());
++    await writeConfig(config);
++    return NextResponse.json({ ok: true });
++  } catch {
++    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
++  }
++}
+diff --git a/frontend/src/app/api/auth/[...nextauth]/route.ts b/frontend/src/app/api/auth/[...nextauth]/route.ts
+new file mode 100644
+index 0000000..f82c6bc
+--- /dev/null
++++ b/frontend/src/app/api/auth/[...nextauth]/route.ts
+@@ -0,0 +1,54 @@
++import NextAuth, { NextAuthOptions } from 'next-auth';
++import GoogleProvider from 'next-auth/providers/google';
++import { Storage } from '@google-cloud/storage';
++import type { AllowedUsersConfig } from '@classcharts/shared';
++
++const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
++
++async function getAllowedEmails(): Promise<string[]> {
++  try {
++    const bucket = storage.bucket(process.env.GCS_BUCKET!);
++    const file = bucket.file(process.env.GCS_ALLOWED_USERS_PATH!);
++    const [content] = await file.download();
++    const config: AllowedUsersConfig = JSON.parse(content.toString());
++    return config.users.map(u => u.email.toLowerCase());
++  } catch {
++    return [];
++  }
++}
++
++export const authOptions: NextAuthOptions = {
++  providers: [
++    GoogleProvider({
++      clientId: process.env.GOOGLE_CLIENT_ID!,
++      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
++    }),
++  ],
++  callbacks: {
++    async signIn({ user }) {
++      const email = user.email?.toLowerCase() ?? '';
++      const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase() ?? '';
++
++      // Admin always allowed
++      if (email === adminEmail) return true;
++
++      // Check GCS allowed list
++      const allowed = await getAllowedEmails();
++      return allowed.includes(email);
++    },
++    async session({ session, token }) {
++      if (session.user?.email) {
++        const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase() ?? '';
++        (session.user as any).isAdmin =
++          session.user.email.toLowerCase() === adminEmail;
++      }
++      return session;
++    },
++  },
++  pages: {
++    signIn: '/auth/signin',
++    error: '/auth/error',
++  },
++};
++
++export default NextAuth(authOptions);
+diff --git a/infra/deploy-poller.sh b/infra/deploy-poller.sh
+new file mode 100644
+index 0000000..3a39e51
+--- /dev/null
++++ b/infra/deploy-poller.sh
+@@ -0,0 +1,44 @@
++#!/usr/bin/env bash
++# infra/deploy-poller.sh — Deploy or update the Cloud Run poller
++set -euo pipefail
++
++PROJECT_ID="${GCP_PROJECT_ID:?Set GCP_PROJECT_ID}"
++REGION="${GCP_REGION:-europe-west2}"
++SERVICE_NAME="classcharts-poller"
++SA_EMAIL="classcharts-poller-sa@$PROJECT_ID.iam.gserviceaccount.com"
++
++echo "▶ Building and deploying Cloud Run service: $SERVICE_NAME"
++
++cd "$(dirname "$0")/.."
++
++gcloud run deploy "$SERVICE_NAME" \
++  --source . \
++  --dockerfile Dockerfile.poller \
++  --region "$REGION" \
++  --service-account "$SA_EMAIL" \
++  --no-allow-unauthenticated \
++  --memory 256Mi \
++  --cpu 1 \
++  --timeout 60 \
++  --max-instances 1 \
++  --set-env-vars "GCP_PROJECT_ID=$PROJECT_ID" \
++  --project "$PROJECT_ID"
++
++SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" \
++  --region "$REGION" --format 'value(status.url)')
++
++echo ""
++echo "✅ Deployed: $SERVICE_URL"
++echo ""
++echo "▶ Creating Pub/Sub push subscription..."
++
++gcloud pubsub subscriptions create classcharts-poll-sub \
++  --topic=classcharts-poll \
++  --push-endpoint="$SERVICE_URL/" \
++  --push-auth-service-account="$SA_EMAIL" \
++  --ack-deadline=60 \
++  2>/dev/null || echo "Subscription already exists"
++
++echo ""
++echo "✅ Poller fully deployed and wired to Pub/Sub"
++echo "   Secrets still need setting — use Secret Manager or gcloud run services update --set-secrets"
+diff --git a/infra/setup.sh b/infra/setup.sh
+new file mode 100644
+index 0000000..8d25de1
+--- /dev/null
++++ b/infra/setup.sh
+@@ -0,0 +1,77 @@
++#!/usr/bin/env bash
++# infra/setup.sh — One-time GCP resource setup
++# Usage: ./setup.sh
++set -euo pipefail
++
++PROJECT_ID="${GCP_PROJECT_ID:?Set GCP_PROJECT_ID}"
++BUCKET="${GCS_BUCKET:?Set GCS_BUCKET}"
++REGION="${GCP_REGION:-europe-west2}"  # London — sensible UK default
++
++echo "▶ Setting project: $PROJECT_ID"
++gcloud config set project "$PROJECT_ID"
++
++# ── Enable APIs ───────────────────────────────────────────────
++echo "▶ Enabling APIs..."
++gcloud services enable \
++  run.googleapis.com \
++  pubsub.googleapis.com \
++  cloudscheduler.googleapis.com \
++  firestore.googleapis.com \
++  storage.googleapis.com \
++  gmail.googleapis.com \
++  secretmanager.googleapis.com
++
++# ── GCS Bucket ────────────────────────────────────────────────
++echo "▶ Creating GCS bucket: $BUCKET"
++gsutil mb -l "$REGION" "gs://$BUCKET" || echo "Bucket already exists"
++
++# ── Seed allowed users config ─────────────────────────────────
++echo "▶ Seeding allowed users config..."
++echo '{"users":[]}' | gsutil cp - "gs://$BUCKET/config/allowed-users.json"
++
++# ── Firestore (Native mode) ───────────────────────────────────
++echo "▶ Creating Firestore database..."
++gcloud firestore databases create \
++  --location="$REGION" \
++  --type=firestore-native 2>/dev/null || echo "Firestore already exists"
++
++# ── Pub/Sub topic ─────────────────────────────────────────────
++echo "▶ Creating Pub/Sub topic: classcharts-poll"
++gcloud pubsub topics create classcharts-poll || echo "Topic already exists"
++
++# ── Cloud Scheduler ───────────────────────────────────────────
++echo "▶ Creating Cloud Scheduler job (every 5 mins)..."
++gcloud scheduler jobs create pubsub classcharts-poller \
++  --location="$REGION" \
++  --schedule="*/5 * * * *" \
++  --topic=classcharts-poll \
++  --message-body='{"trigger":"scheduled"}' \
++  --description="Triggers ClassCharts poller every 5 minutes" \
++  2>/dev/null || echo "Scheduler job already exists"
++
++# ── Service Account for Cloud Run ────────────────────────────
++echo "▶ Creating service account for poller..."
++SA_NAME="classcharts-poller-sa"
++SA_EMAIL="$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com"
++
++gcloud iam service-accounts create "$SA_NAME" \
++  --display-name="ClassCharts Poller" 2>/dev/null || echo "SA already exists"
++
++# Grant necessary roles
++for ROLE in \
++  roles/datastore.user \
++  roles/storage.objectAdmin \
++  roles/pubsub.subscriber; do
++  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
++    --member="serviceAccount:$SA_EMAIL" \
++    --role="$ROLE" --quiet
++done
++
++echo ""
++echo "✅ GCP setup complete!"
++echo ""
++echo "Next steps:"
++echo "  1. Deploy poller: cd .. && gcloud run deploy classcharts-poller --source . --file Dockerfile.poller --region $REGION --service-account $SA_EMAIL"
++echo "  2. Create Pub/Sub push subscription pointing to your Cloud Run URL"
++echo "  3. Deploy frontend: cd frontend && gcloud app deploy"
++echo "  4. Set env vars/secrets via Secret Manager"
+diff --git a/poller/package.json b/poller/package.json
+new file mode 100644
+index 0000000..4cfd21a
+--- /dev/null
++++ b/poller/package.json
+@@ -0,0 +1,22 @@
++{
++  "name": "classcharts-poller",
++  "version": "1.0.0",
++  "private": true,
++  "scripts": {
++    "start": "node dist/index.js",
++    "build": "tsc",
++    "dev": "ts-node src/index.ts"
++  },
++  "dependencies": {
++    "@classcharts/shared": "file:../shared",
++    "@google-cloud/firestore": "^7.9.0",
++    "@google-cloud/storage": "^7.11.0",
++    "axios": "^1.7.0",
++    "googleapis": "^140.0.0"
++  },
++  "devDependencies": {
++    "typescript": "^5.4.0",
++    "@types/node": "^20.0.0",
++    "ts-node": "^10.9.0"
++  }
++}
+diff --git a/poller/src/formatter.ts b/poller/src/formatter.ts
+new file mode 100644
+index 0000000..6ae6beb
+--- /dev/null
++++ b/poller/src/formatter.ts
+@@ -0,0 +1,45 @@
++import type { NotificationEvent } from '@classcharts/shared';
++
++interface FormattedNotification {
++  title: string;
++  message: string;
++  priority: -1 | 0 | 1 | 2;
++}
++
++export function formatNotification(
++  studentName: string,
++  event: NotificationEvent
++): FormattedNotification {
++  switch (event.type) {
++    case 'homework':
++      return {
++        title: `📚 Homework – ${studentName}`,
++        message: `${event.data.subject}: "${event.data.title}" due ${event.data.dueDate}`,
++        priority: 0,
++      };
++
++    case 'behaviour':
++      const isPositive = event.data.score > 0;
++      return {
++        title: isPositive
++          ? `⭐ Award – ${studentName}`
++          : `⚠️ Behaviour – ${studentName}`,
++        message: `${event.data.reason}${event.data.lessonName ? ` (${event.data.lessonName})` : ''}`,
++        priority: isPositive ? -1 : 1,
++      };
++
++    case 'attendance':
++      return {
++        title: `📋 Attendance – ${studentName}`,
++        message: `AM: ${event.data.amStatus} / PM: ${event.data.pmStatus} on ${event.data.date}`,
++        priority: 1,
++      };
++
++    case 'announcement':
++      return {
++        title: `📢 Announcement – ${studentName}`,
++        message: `${event.data.title} (from ${event.data.teacherName})`,
++        priority: event.data.priority === 'high' ? 1 : 0,
++      };
++  }
++}
+diff --git a/poller/src/gmail.ts b/poller/src/gmail.ts
+new file mode 100644
+index 0000000..c88d777
+--- /dev/null
++++ b/poller/src/gmail.ts
+@@ -0,0 +1,61 @@
++import { google } from 'googleapis';
++import { Firestore } from '@google-cloud/firestore';
++import { sendPushover } from './pushover';
++
++const db = new Firestore({ projectId: process.env.GCP_PROJECT_ID });
++
++function getGmailClient() {
++  const auth = new google.auth.OAuth2(
++    process.env.GMAIL_CLIENT_ID,
++    process.env.GMAIL_CLIENT_SECRET
++  );
++  auth.setCredentials({ refresh_token: process.env.GMAIL_REFRESH_TOKEN });
++  return google.gmail({ version: 'v1', auth });
++}
++
++export async function watchGmail(): Promise<void> {
++  const gmail = getGmailClient();
++
++  // Get last processed email ID from Firestore
++  const stateDoc = await db.collection('poll_state').doc('gmail').get();
++  const lastEmailId: string = stateDoc.exists ? stateDoc.data()?.lastEmailId ?? '' : '';
++
++  const res = await gmail.users.messages.list({
++    userId: 'me',
++    q: 'from:noreply@classcharts.com is:unread',
++    maxResults: 10,
++  });
++
++  const messages = res.data.messages ?? [];
++  const newMessages = lastEmailId
++    ? messages.filter(m => m.id! > lastEmailId)
++    : messages;
++
++  for (const msg of newMessages) {
++    const full = await gmail.users.messages.get({ userId: 'me', id: msg.id! });
++    const headers = full.data.payload?.headers ?? [];
++    const subject = headers.find(h => h.name === 'Subject')?.value ?? 'ClassCharts notification';
++
++    // Mark as read
++    await gmail.users.messages.modify({
++      userId: 'me',
++      id: msg.id!,
++      requestBody: { removeLabelIds: ['UNREAD'] },
++    });
++
++    // Only send Pushover if it's not something we already caught via API polling
++    // (announcements and comms that don't appear in the API)
++    if (!subject.toLowerCase().includes('new activity')) {
++      await sendPushover('📧 ClassCharts Email', subject, 0);
++    }
++  }
++
++  if (newMessages.length > 0) {
++    const latestId = newMessages[0].id!;
++    await db.collection('poll_state').doc('gmail').set({
++      lastEmailId: latestId,
++      updatedAt: new Date().toISOString(),
++    });
++    console.log(`Gmail: processed ${newMessages.length} new messages`);
++  }
++}
+diff --git a/poller/src/index.ts b/poller/src/index.ts
+new file mode 100644
+index 0000000..7178a6e
+--- /dev/null
++++ b/poller/src/index.ts
+@@ -0,0 +1,29 @@
++import express from 'express';
++import { pollClassCharts } from './poller';
++import { watchGmail } from './gmail';
++
++const app = express();
++app.use(express.json());
++
++// Pub/Sub push endpoint
++app.post('/', async (req, res) => {
++  console.log('Poll triggered via Pub/Sub');
++  try {
++    // Run both in parallel
++    await Promise.all([
++      pollClassCharts(),
++      watchGmail(),
++    ]);
++    res.status(204).send();
++  } catch (err) {
++    console.error('Poll failed:', err);
++    // Return 200 to avoid Pub/Sub retry storm — we handle retry logic internally
++    res.status(200).json({ error: String(err) });
++  }
++});
++
++// Health check
++app.get('/health', (_req, res) => res.json({ ok: true }));
++
++const PORT = process.env.PORT || 8080;
++app.listen(PORT, () => console.log(`Poller listening on ${PORT}`));
+diff --git a/poller/src/poller.ts b/poller/src/poller.ts
+new file mode 100644
+index 0000000..322673a
+--- /dev/null
++++ b/poller/src/poller.ts
+@@ -0,0 +1,113 @@
++import { ClassChartsClient } from '@classcharts/shared';
++import type { PollState, NotificationEvent } from '@classcharts/shared';
++import { Firestore } from '@google-cloud/firestore';
++import { sendPushover } from './pushover';
++import { formatNotification } from './formatter';
++
++const db = new Firestore({ projectId: process.env.GCP_PROJECT_ID });
++
++interface ParentConfig {
++  email: string;
++  code: string;
++}
++
++function getParentConfigs(): ParentConfig[] {
++  const configs: ParentConfig[] = [];
++  if (process.env.CLASSCHARTS_PARENT1_EMAIL && process.env.CLASSCHARTS_PARENT1_CODE) {
++    configs.push({
++      email: process.env.CLASSCHARTS_PARENT1_EMAIL,
++      code: process.env.CLASSCHARTS_PARENT1_CODE,
++    });
++  }
++  if (process.env.CLASSCHARTS_PARENT2_EMAIL && process.env.CLASSCHARTS_PARENT2_CODE) {
++    configs.push({
++      email: process.env.CLASSCHARTS_PARENT2_EMAIL,
++      code: process.env.CLASSCHARTS_PARENT2_CODE,
++    });
++  }
++  return configs;
++}
++
++async function getState(studentId: number): Promise<PollState | null> {
++  const doc = await db.collection('poll_state').doc(String(studentId)).get();
++  return doc.exists ? (doc.data() as PollState) : null;
++}
++
++async function saveState(state: PollState): Promise<void> {
++  await db.collection('poll_state').doc(String(state.studentId)).set(state);
++}
++
++export async function pollClassCharts(): Promise<void> {
++  const parents = getParentConfigs();
++  const today = new Date().toISOString().split('T')[0];
++  const twoWeeksAgo = new Date(Date.now() - 14 * 86400000).toISOString().split('T')[0];
++
++  for (const parent of parents) {
++    const client = new ClassChartsClient(parent.email, parent.code);
++    const students = await client.login();
++
++    for (const student of students) {
++      const state = await getState(student.id) ?? {
++        studentId: student.id,
++        lastHomeworkId: 0,
++        lastBehaviourId: 0,
++        lastAnnouncementId: 0,
++        lastAttendanceDate: '',
++        lastEmailId: '',
++        updatedAt: new Date().toISOString(),
++      };
++
++      const events: NotificationEvent[] = [];
++
++      // ── Homework ────────────────────────────────────────────
++      const homeworks = await client.getHomework(student.id, twoWeeksAgo, today);
++      const newHomeworks = homeworks.filter(h => h.id > state.lastHomeworkId);
++      for (const hw of newHomeworks) {
++        events.push({ type: 'homework', data: hw });
++      }
++      if (newHomeworks.length > 0) {
++        state.lastHomeworkId = Math.max(...newHomeworks.map(h => h.id));
++      }
++
++      // ── Behaviour ───────────────────────────────────────────
++      const behaviours = await client.getBehaviour(student.id, twoWeeksAgo, today);
++      const newBehaviours = behaviours.filter(b => b.id > state.lastBehaviourId);
++      for (const beh of newBehaviours) {
++        events.push({ type: 'behaviour', data: beh });
++      }
++      if (newBehaviours.length > 0) {
++        state.lastBehaviourId = Math.max(...newBehaviours.map(b => b.id));
++      }
++
++      // ── Announcements ────────────────────────────────────────
++      const announcements = await client.getAnnouncements(student.id);
++      const newAnnouncements = announcements.filter(a => a.id > state.lastAnnouncementId);
++      for (const ann of newAnnouncements) {
++        events.push({ type: 'announcement', data: ann });
++      }
++      if (newAnnouncements.length > 0) {
++        state.lastAnnouncementId = Math.max(...newAnnouncements.map(a => a.id));
++      }
++
++      // ── Attendance ───────────────────────────────────────────
++      const attendances = await client.getAttendance(student.id, today, today);
++      for (const att of attendances) {
++        if (att.date > state.lastAttendanceDate) {
++          events.push({ type: 'attendance', data: att });
++          state.lastAttendanceDate = att.date;
++        }
++      }
++
++      // ── Send notifications ───────────────────────────────────
++      for (const event of events) {
++        const { title, message, priority } = formatNotification(student.name, event);
++        await sendPushover(title, message, priority);
++      }
++
++      state.updatedAt = new Date().toISOString();
++      await saveState(state);
++
++      console.log(`Polled ${student.name}: ${events.length} new events`);
++    }
++  }
++}
+diff --git a/poller/src/pushover.ts b/poller/src/pushover.ts
+new file mode 100644
+index 0000000..d1be340
+--- /dev/null
++++ b/poller/src/pushover.ts
+@@ -0,0 +1,26 @@
++import axios from 'axios';
++
++type PushoverPriority = -1 | 0 | 1 | 2;
++
++export async function sendPushover(
++  title: string,
++  message: string,
++  priority: PushoverPriority = 0
++): Promise<void> {
++  const keys = [
++    process.env.PUSHOVER_USER_KEY,
++    process.env.PUSHOVER_USER_KEY_2,
++  ].filter(Boolean);
++
++  for (const userKey of keys) {
++    await axios.post('https://api.pushover.net/1/messages.json', {
++      token: process.env.PUSHOVER_API_TOKEN,
++      user: userKey,
++      title,
++      message,
++      priority,
++      // For priority 2 (emergency), require acknowledgement
++      ...(priority === 2 ? { retry: 60, expire: 3600 } : {}),
++    });
++  }
++}
+diff --git a/poller/tsconfig.json b/poller/tsconfig.json
+new file mode 100644
+index 0000000..94bc179
+--- /dev/null
++++ b/poller/tsconfig.json
+@@ -0,0 +1,14 @@
++{
++  "compilerOptions": {
++    "target": "ES2020",
++    "module": "commonjs",
++    "lib": ["ES2020"],
++    "outDir": "./dist",
++    "rootDir": "./src",
++    "strict": true,
++    "esModuleInterop": true,
++    "resolveJsonModule": true
++  },
++  "include": ["src"],
++  "exclude": ["node_modules", "dist"]
++}
+diff --git a/shared/package.json b/shared/package.json
+new file mode 100644
+index 0000000..d0155c6
+--- /dev/null
++++ b/shared/package.json
+@@ -0,0 +1,18 @@
++{
++  "name": "@classcharts/shared",
++  "version": "1.0.0",
++  "private": true,
++  "main": "dist/index.js",
++  "types": "dist/index.d.ts",
++  "scripts": {
++    "build": "tsc",
++    "dev": "tsc --watch"
++  },
++  "dependencies": {
++    "axios": "^1.7.0"
++  },
++  "devDependencies": {
++    "typescript": "^5.4.0",
++    "@types/node": "^20.0.0"
++  }
++}
+diff --git a/shared/src/classcharts.ts b/shared/src/classcharts.ts
+new file mode 100644
+index 0000000..30dc5a5
+--- /dev/null
++++ b/shared/src/classcharts.ts
+@@ -0,0 +1,70 @@
++import axios, { AxiosInstance } from 'axios';
++import type {
++  CCStudent,
++  CCBehaviourPoint,
++  CCHomework,
++  CCAttendance,
++  CCTimetableLesson,
++  CCAnnouncement,
++} from './types';
++
++const BASE_URL = 'https://apiv2.classcharts.com/apiv2parent';
++
++export class ClassChartsClient {
++  private http: AxiosInstance;
++  private sessionId: string | null = null;
++  private studentId: number | null = null;
++
++  constructor(private email: string, private code: string) {
++    this.http = axios.create({ baseURL: BASE_URL });
++  }
++
++  async login(): Promise<CCStudent[]> {
++    const res = await this.http.post('/login', {
++      email: this.email,
++      password: this.code,
++      remember_me: 1,
++    });
++    this.sessionId = res.data.data?.session_id;
++    this.http.defaults.headers.common['Authorization'] = `Basic ${this.sessionId}`;
++    return res.data.data?.pupils ?? [];
++  }
++
++  async getStudents(): Promise<CCStudent[]> {
++    const res = await this.http.get('/pupils');
++    return res.data.data ?? [];
++  }
++
++  async getHomework(studentId: number, from: string, to: string): Promise<CCHomework[]> {
++    const res = await this.http.get(`/homeworks/${studentId}`, {
++      params: { display_date: 'due_date', from, to },
++    });
++    return res.data.data ?? [];
++  }
++
++  async getBehaviour(studentId: number, from: string, to: string): Promise<CCBehaviourPoint[]> {
++    const res = await this.http.get(`/behaviour/${studentId}`, {
++      params: { from, to },
++    });
++    return res.data.data?.timeline ?? [];
++  }
++
++  async getAttendance(studentId: number, from: string, to: string): Promise<CCAttendance[]> {
++    const res = await this.http.get(`/attendance/${studentId}`, {
++      params: { from, to },
++    });
++    return res.data.data ?? [];
++  }
++
++  async getTimetable(studentId: number, date: string): Promise<CCTimetableLesson[]> {
++    const res = await this.http.get(`/timetable/${studentId}`, {
++      params: { date },
++    });
++    return res.data.data ?? [];
++  }
++
++  async getAnnouncements(studentId: number): Promise<CCAnnouncement[]> {
++    const res = await this.http.get(`/announcements/${studentId}`);
++    return res.data.data ?? [];
++  }
++}
+diff --git a/shared/src/index.ts b/shared/src/index.ts
+new file mode 100644
+index 0000000..6960cb5
+--- /dev/null
++++ b/shared/src/index.ts
+@@ -0,0 +1,2 @@
++export * from './types';
++export * from './classcharts';
+diff --git a/shared/src/types.ts b/shared/src/types.ts
+new file mode 100644
+index 0000000..fd208d5
+--- /dev/null
++++ b/shared/src/types.ts
+@@ -0,0 +1,95 @@
++// ── ClassCharts data types ────────────────────────────────────
++
++export interface CCStudent {
++  id: number;
++  name: string;
++  school: string;
++  avatarUrl?: string;
++}
++
++export interface CCBehaviourPoint {
++  id: number;
++  studentId: number;
++  timestamp: string;
++  score: number; // positive or negative
++  reason: string;
++  lessonName?: string;
++  teacherName?: string;
++}
++
++export interface CCHomework {
++  id: number;
++  studentId: number;
++  title: string;
++  description: string;
++  subject: string;
++  setDate: string;
++  dueDate: string;
++  status: 'todo' | 'completed' | 'late';
++  attachmentUrl?: string;
++}
++
++export interface CCAttendance {
++  studentId: number;
++  date: string;
++  amStatus: string;
++  pmStatus: string;
++  lessons: CCLessonAttendance[];
++}
++
++export interface CCLessonAttendance {
++  period: string;
++  subject: string;
++  status: string;
++}
++
++export interface CCTimetableLesson {
++  studentId: number;
++  date: string;
++  period: string;
++  subject: string;
++  teacher: string;
++  room: string;
++}
++
++export interface CCAnnouncement {
++  id: number;
++  title: string;
++  description: string;
++  teacherName: string;
++  timestamp: string;
++  priority: 'normal' | 'high';
++}
++
++// ── Poll state (stored in Firestore) ─────────────────────────
++
++export interface PollState {
++  studentId: number;
++  lastHomeworkId: number;
++  lastBehaviourId: number;
++  lastAnnouncementId: number;
++  lastAttendanceDate: string;
++  lastEmailId: string;
++  updatedAt: string;
++}
++
++// ── Notification events ───────────────────────────────────────
++
++export type NotificationEvent =
++  | { type: 'homework'; data: CCHomework }
++  | { type: 'behaviour'; data: CCBehaviourPoint }
++  | { type: 'attendance'; data: CCAttendance }
++  | { type: 'announcement'; data: CCAnnouncement };
++
++// ── Auth ──────────────────────────────────────────────────────
++
++export interface AllowedUser {
++  email: string;
++  name?: string;
++  addedBy: string;
++  addedAt: string;
++}
++
++export interface AllowedUsersConfig {
++  users: AllowedUser[];
++}
+diff --git a/shared/tsconfig.json b/shared/tsconfig.json
+new file mode 100644
+index 0000000..73f79fb
+--- /dev/null
++++ b/shared/tsconfig.json
+@@ -0,0 +1,16 @@
++{
++  "compilerOptions": {
++    "target": "ES2020",
++    "module": "commonjs",
++    "lib": ["ES2020"],
++    "outDir": "./dist",
++    "rootDir": "./src",
++    "strict": true,
++    "esModuleInterop": true,
++    "declaration": true,
++    "declarationMap": true,
++    "sourceMap": true
++  },
++  "include": ["src"],
++  "exclude": ["node_modules", "dist"]
++}
+-- 
+2.43.0

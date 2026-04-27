@@ -1,11 +1,9 @@
 runtime: nodejs22
-
 instance_class: F1
-
 automatic_scaling:
   min_idle_instances: 0
   max_idle_instances: 1
-
+  max_instances: 2
 env_variables:
   NODE_ENV: "production"
   GCP_PROJECT_ID: "classcharts"
@@ -13,6 +11,14 @@ env_variables:
   GCS_ALLOWED_USERS_PATH: "config/allowed-users.json"
   NEXTAUTH_URL: "https://classcharts.funfairlabs.com"
   NEXTAUTH_URL_INTERNAL: "https://classcharts.funfairlabs.com"
-
+  NEXTAUTH_SECRET: "IWNoL9OYyYTLsHHo2Ia8+fRzwgXlxdi4jXrNwONe8w4"
+  ADMIN_EMAIL: "tobiasbrecker@gmail.com"
+  CLASSCHARTS_PARENT1_EMAIL: "tobiasbrecker@gmail.com"
+  CLASSCHARTS_PARENT1_PASSWORD: "K3!raMoLli3"
+  PUSHOVER_API_TOKEN: "a99kjyx6swgzcb34ttwigcmqe7ay3w"
+  PUSHOVER_USER_KEY: "upnnfz5woucwuut8qjzd943jof4h1u"
+  NEXT_PUBLIC_COMMIT_SHA: "fff7769"
+  NEXT_PUBLIC_DEPLOYED_AT: "30/04/2026 15:10:18 GMT"
+  NEXT_PUBLIC_APP_URL: "https://classcharts.appspot.com"
 beta_settings:
   cloud_build_timeout: "900"

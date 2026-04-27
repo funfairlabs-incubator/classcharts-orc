@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "gcp-build": "cd ../shared && npm install && npm run build && cd ../frontend && npm install && next build",
+    "gcp-build": "cd vendor/shared && npm install --production && cd ../.. && next build",
     "build": "next build",
     "dev": "next dev",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
-    "@classcharts/shared": "file:../shared",
+    "@classcharts/shared": "file:./vendor/shared",
     "@google-cloud/firestore": "^7.10.0",
     "@google-cloud/storage": "^7.11.0",
     "next": "^14.2.0",
