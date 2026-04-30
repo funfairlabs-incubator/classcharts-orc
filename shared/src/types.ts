@@ -140,6 +140,7 @@ export interface PollState {
   lastActivityId: number;
   lastHomeworkId: number;
   lastAnnouncementId: number;
+  seenAnnouncementIds?: number[];
   lastAttendanceDate: string;
   lastEmailId: string;
   updatedAt: string;

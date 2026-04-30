@@ -206,8 +206,11 @@ ${(err as any)?.stack ?? ''}`,
       if (pupil.displayAnnouncements) {
         try {
           const announcements = await client.getAnnouncements();
-          console.log(`  Announcements: ${announcements.length} total, lastSeen=${state.lastAnnouncementId}, ids=[${announcements.map(a=>a.id).join(',')}]`);
-          const newAnnouncements = announcements.filter(a => a.id > state.lastAnnouncementId);
+          // Use a set of seen IDs to catch announcements regardless of ordering
+          if (!state.seenAnnouncementIds) state.seenAnnouncementIds = [];
+          const seenSet = new Set(state.seenAnnouncementIds);
+          console.log(`  Announcements: ${announcements.length} total, seen=${seenSet.size}, ids=[${announcements.map(a=>a.id).join(',')}]`);
+          const newAnnouncements = announcements.filter(a => !seenSet.has(a.id));
           if (newAnnouncements.length > 0) {
             const keys = await getEnabledKeys('announcements');
             console.log(`  New announcements: ${newAnnouncements.length}, pushover keys: ${keys.length}`);
@@ -225,8 +228,11 @@ ${(err as any)?.stack ?? ''}`,
                 catch (err) { console.error('  Calendar event creation failed:', err); }
               }
               await sendPushoverToKeys(keys, formatAnnouncement(ann, pupil.name, analysis.summary, analysis.requiresAction, analysis.actionDescription, calendarAdded));
+              seenSet.add(ann.id);
             }
-            state.lastAnnouncementId = Math.max(...newAnnouncements.map(a => a.id));
+            // Keep last 50 seen IDs to avoid unbounded growth
+            state.seenAnnouncementIds = [...seenSet].slice(-50);
+            state.lastAnnouncementId = Math.max(...[...seenSet]);
             changed = true;
           }
         } catch (err) { console.error(`  Announcements poll failed for ${pupil.name}:`, err); }
