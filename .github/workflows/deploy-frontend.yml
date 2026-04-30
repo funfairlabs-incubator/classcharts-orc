@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
@@ -37,3 +39,4 @@ jobs:
         run: bash infra/deploy-frontend.sh
         env:
           GCP_PROJECT_ID: classcharts
+          GITHUB_SHA: ${{ github.sha }}
