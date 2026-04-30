@@ -1,7 +1,7 @@
 import type { CCAnnouncement, CCHomework, CCActivityPoint, CalendarEvent } from '@classcharts/shared';
 
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
-const MODEL = 'claude-sonnet-4-20250514';
+const MODEL = 'claude-3-5-sonnet-20241022';
 
 interface ClaudeMessage {
   role: 'user' | 'assistant';
