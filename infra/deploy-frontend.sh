@@ -40,9 +40,10 @@ fs.writeFileSync('$REPO_ROOT/frontend/package.json', JSON.stringify(pkg, null, 2
 "
 
 echo "▶ Writing app.yaml with secrets..."
-COMMIT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+COMMIT_SHA=${GITHUB_SHA:0:7}
+COMMIT_SHA=${COMMIT_SHA:-$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")}
 DEPLOYED_AT=$(date -u +"%d/%m/%Y %H:%M:%S GMT")
-APP_URL="https://${PROJECT_ID}.appspot.com"
+APP_URL="https://classcharts.funfairlabs.com"
 
 # Write build-info.json stamped at deploy time — read by Next.js at build time
 cat > "$REPO_ROOT/frontend/build-info.json" << JSON
