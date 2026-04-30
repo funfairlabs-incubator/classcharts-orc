@@ -11,8 +11,6 @@ env_variables:
   GCS_ALLOWED_USERS_PATH: "config/allowed-users.json"
   NEXTAUTH_URL: "https://classcharts.funfairlabs.com"
   NEXTAUTH_URL_INTERNAL: "https://classcharts.funfairlabs.com"
-  GOOGLE_CLIENT_ID: "306745837103-au2cbaajmb20vf02hghqlh0848mui99g.apps.googleusercontent.com"
-  GOOGLE_CLIENT_SECRET: "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"
   NEXTAUTH_SECRET: "IWNoL9OYyYTLsHHo2Ia8+fRzwgXlxdi4jXrNwONe8w4"
   ADMIN_EMAIL: "tobiasbrecker@gmail.com"
   CLASSCHARTS_PARENT1_EMAIL: "tobiasbrecker@gmail.com"
