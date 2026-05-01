@@ -233,7 +233,7 @@ ${(err as any)?.stack ?? ''}`,
               seenSet.add(ann.id);
             }
             // Keep last 50 seen IDs to avoid unbounded growth
-            state.seenAnnouncementIds = [...seenSet].slice(-50);
+            state.seenAnnouncementIds = [...seenSet].slice(-200);
             state.lastAnnouncementId = Math.max(...[...seenSet]);
             changed = true;
           }
