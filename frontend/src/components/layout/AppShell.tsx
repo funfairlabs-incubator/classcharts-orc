@@ -36,7 +36,8 @@ export function AppShell({ children, session }: { children: React.ReactNode; ses
 
 const NAV = [
   { href: '/',              label: 'Home',         icon: '⌂' },
-  { href: '/timetable',     label: 'Timetable',    icon: '◷' },
+  { href: '/day',           label: 'Day View',     icon: '◷' },
+  { href: '/timetable',     label: 'Timetable',    icon: '📅' },
   { href: '/homework',      label: 'Homework',     icon: '✎' },
   { href: '/behaviour',     label: 'Behaviour',    icon: '★' },
   { href: '/attendance',    label: 'Attendance',   icon: '✓' },
