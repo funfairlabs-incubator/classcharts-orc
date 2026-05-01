@@ -27,7 +27,7 @@ app.post('/', async (req, res) => {
   }
 });
 
-app.get('/health', (_req, res) => res.json({ ok: true, version: '2' }));
+app.get('/health', (_req, res) => res.json({ ok: true, version: '3' }));
 
 // Manual trigger for testing — requires same auth as Pub/Sub
 app.post('/trigger', async (_req, res) => {
