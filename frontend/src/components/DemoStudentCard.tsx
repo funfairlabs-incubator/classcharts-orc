@@ -44,9 +44,9 @@ export function DemoStudentCard({ accent }: Props) {
           background: accent.color, color: '#fff',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', flexShrink: 0,
-        }}>JB</div>
+        }}>DS</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 18, fontWeight: 700, lineHeight: 1.2, marginBottom: 2 }}>Jamie Brecker</div>
+          <div style={{ fontSize: 18, fontWeight: 700, lineHeight: 1.2, marginBottom: 2 }}>Demo Student</div>
           <div style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 500 }}>All Saints' Catholic High School</div>
         </div>
         <span style={{

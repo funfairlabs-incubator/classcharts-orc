@@ -22,15 +22,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            shared/package-lock.json
+            frontend/package-lock.json
 
       - name: Install shared
-        run: cd shared && npm install --ignore-scripts
+        run: cd shared && npm ci --ignore-scripts
 
       - name: Build shared
         run: cd shared && npm run build
 
       - name: Install frontend
-        run: cd frontend && npm install --ignore-scripts
+        run: cd frontend && npm ci --ignore-scripts
 
       - name: Copy shared into vendor
         run: |
