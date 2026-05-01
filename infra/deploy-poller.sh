@@ -65,13 +65,13 @@ echo ""
 echo "▶ Verifying Pub/Sub subscription..."
 EXPECTED_URL="https://classcharts-poller-306745837103.europe-west2.run.app/"
 
-# Find subscription name dynamically
+# List all subscriptions and find one associated with our topic
 SUB_NAME=$(gcloud pubsub subscriptions list \
   --project="$PROJECT_ID" \
-  --format="value(name)" 2>/dev/null | grep -i "classcharts" | head -1 || echo "")
+  --format="value(name)" 2>/dev/null | head -20 | grep -v "^$" | head -1 || echo "")
 
 if [ -z "$SUB_NAME" ]; then
-  echo "⚠ No ClassCharts Pub/Sub subscription found — skipping endpoint check"
+  echo "⚠ No Pub/Sub subscriptions found — skipping endpoint check"
 else
   SUB_SHORT=$(basename "$SUB_NAME")
   PUSH_URL=$(gcloud pubsub subscriptions describe "$SUB_SHORT" \
@@ -79,7 +79,9 @@ else
     --format="value(pushConfig.pushEndpoint)" 2>/dev/null || echo "")
   echo "  Subscription: $SUB_SHORT"
   echo "  Push endpoint: ${PUSH_URL:-none}"
-  if [ "$PUSH_URL" != "$EXPECTED_URL" ]; then
+  if [ -z "$PUSH_URL" ]; then
+    echo "⚠ No push endpoint configured — this subscription may be pull-based"
+  elif [ "$PUSH_URL" != "$EXPECTED_URL" ]; then
     echo "⚠ Push endpoint mismatch — updating..."
     gcloud pubsub subscriptions modify-push-config "$SUB_SHORT" \
       --push-endpoint="$EXPECTED_URL" \
@@ -89,5 +91,4 @@ else
   else
     echo "✅ Subscription push endpoint correct"
   fi
-fi
 fi
