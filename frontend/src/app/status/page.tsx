@@ -20,6 +20,7 @@ const DEPENDENCY_LABELS: Record<string, string> = {
   firestore: 'Firestore',
   anthropic: 'Anthropic (AI summaries)',
   pushover: 'Pushover (notifications)',
+  pubsub: 'Pub/Sub',
 };
 
 const DEPENDENCY_DOCS: Record<string, string> = {
@@ -27,6 +28,7 @@ const DEPENDENCY_DOCS: Record<string, string> = {
   firestore: 'State + announcement archive storage. Required for all data persistence.',
   anthropic: 'Announcement and homework summarisation. Degrades gracefully if unavailable.',
   pushover: 'Push notifications to parents. Degrades gracefully if unavailable.',
+  pubsub: 'Cloud Scheduler → Pub/Sub → Cloud Run trigger chain. If poller goes stale, check subscription push endpoint and IAM binding. Both are re-verified on every poller deploy.',
 };
 
 function ago(ts: string): string {
@@ -78,7 +80,13 @@ export default function StatusPage() {
 
   const hb = status?.heartbeat;
   const age = hb ? pollAge(hb.polledAt) : null;
-  const allOk = hb ? Object.values(hb.dependencies).every(v => v === 'ok') : false;
+  // If poller is stale (>15m), Pub/Sub trigger chain is implicitly broken
+  const staleMins = hb ? Math.floor((Date.now() - new Date(hb.polledAt).getTime()) / 60000) : 0;
+  const displayDeps = hb ? {
+    ...hb.dependencies,
+    pubsub: staleMins > 15 ? 'error' : (hb.dependencies.pubsub ?? 'ok'),
+  } : {};
+  const allOk = hb ? Object.values(displayDeps).every(v => v === 'ok') && staleMins <= 15 : false;
 
   return (
     <div style={styles.page}>
@@ -176,7 +184,7 @@ export default function StatusPage() {
             <div style={{ padding: '10px 16px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
               <span style={styles.sectionLabel}>Dependencies</span>
             </div>
-            {Object.entries(hb.dependencies).map(([key, val], i, arr) => (
+            {Object.entries(displayDeps).map(([key, val], i, arr) => (
               <div key={key} style={{
                 padding: '12px 16px',
                 borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none',

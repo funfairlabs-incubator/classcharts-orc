@@ -298,6 +298,7 @@ ${(err as any)?.stack ?? ''}`,
       firestore: pollErrors.some(e => e.includes('Firestore') || e.includes('firestore')) ? 'error' : 'ok',
       anthropic: pollErrors.some(e => e.includes('Anthropic') || e.includes('claude') || e.includes('summarise')) ? 'error' : 'ok',
       pushover: pollErrors.some(e => e.includes('Pushover') || e.includes('pushover')) ? 'error' : 'ok',
+      pubsub: 'ok', // If poller ran, Pub/Sub delivered successfully
     },
     errors: pollErrors.length > 0 ? pollErrors.slice(-10) : undefined,
   });
