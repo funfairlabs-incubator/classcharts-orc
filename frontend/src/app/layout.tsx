@@ -7,7 +7,7 @@ import { AppShell } from '@/components/layout/AppShell';
 
 export const metadata: Metadata = {
   title: "ClassCharts — All Saints'",
-  description: 'Parent dashboard for All Saints' Catholic High School',
+  description: "Parent dashboard for All Saints Catholic High School",
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
