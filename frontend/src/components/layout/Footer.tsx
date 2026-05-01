@@ -93,7 +93,7 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 10,
   },
   brand: { color: 'var(--text-3)' },
-  right: { display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-3)', opacity: 0.6 },
+  right: { display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-3)', opacity: 0.6, whiteSpace: 'nowrap', overflow: 'hidden' },
   code: { fontFamily: 'var(--font-mono)', fontSize: 11, background: 'var(--surface-2)', padding: '1px 4px', borderRadius: 3 },
   trafficLight: { display: 'inline-flex', alignItems: 'center', textDecoration: 'none', padding: '0 2px' },
 };

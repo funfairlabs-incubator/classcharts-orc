@@ -289,6 +289,7 @@ ${(err as any)?.stack ?? ''}`,
   }
 
   // Write heartbeat to Firestore so status page can show last successful poll
+  try {
   await writeHeartbeat({
     polledAt: new Date().toISOString(),
     pupils: allStudents.map(s => s.name),
@@ -300,4 +301,6 @@ ${(err as any)?.stack ?? ''}`,
     },
     errors: pollErrors.length > 0 ? pollErrors.slice(-10) : undefined,
   });
+  console.log('Heartbeat written to Firestore');
+  } catch (err) { console.error('Failed to write heartbeat:', err); }
 }
