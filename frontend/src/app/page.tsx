@@ -346,16 +346,16 @@ function timeMins(t: string) {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { maxWidth: 1100, margin: '0 auto', padding: '24px 16px 48px' },
-  pageHeader: { marginBottom: 28 },
+  page: { maxWidth: 1100, margin: '0 auto', padding: '12px 12px 56px' },
+  pageHeader: { marginBottom: 12 },
   dateStr: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 },
-  pageTitle: { fontSize: 28, fontWeight: 700 },
+  pageTitle: { fontSize: 22, fontWeight: 700 },
 
   // Grid: stacked on mobile, side by side on tablet+
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-    gap: 20,
+    gap: 12,
     alignItems: 'start',
   },
 
