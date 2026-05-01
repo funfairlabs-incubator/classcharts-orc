@@ -60,6 +60,18 @@ gcloud run services add-iam-policy-binding "$SERVICE" \
   --quiet
 echo "✅ IAM binding confirmed"
 
+# Test publish to verify the Pub/Sub → Cloud Run chain works
+echo ""
+echo "▶ Testing Pub/Sub trigger chain..."
+TOPIC=$(gcloud pubsub topics list --project="$PROJECT_ID" --format="value(name)" 2>/dev/null | head -1 || echo "")
+if [ -n "$TOPIC" ]; then
+  TOPIC_SHORT=$(basename "$TOPIC")
+  echo "  Publishing test message to topic: $TOPIC_SHORT"
+  gcloud pubsub topics publish "$TOPIC_SHORT"     --message='{"trigger":"scheduled"}'     --project="$PROJECT_ID" 2>/dev/null && echo "✅ Test message published" || echo "⚠ Publish failed"
+else
+  echo "⚠ No topics found"
+fi
+
 # Verify Pub/Sub subscription push endpoint is correct
 echo ""
 echo "▶ Verifying Pub/Sub subscription..."
