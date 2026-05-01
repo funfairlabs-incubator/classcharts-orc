@@ -60,35 +60,32 @@ gcloud run services add-iam-policy-binding "$SERVICE" \
   --quiet
 echo "✅ IAM binding confirmed"
 
-# Verify Pub/Sub subscription push endpoint is correct
+# Verify and fix Pub/Sub subscription push endpoint
 echo ""
 echo "▶ Verifying Pub/Sub subscription..."
+SUB="classcharts-poller-sub"
 EXPECTED_URL="https://classcharts-poller-306745837103.europe-west2.run.app/"
-
-# List all subscriptions and find one associated with our topic
-SUB_NAME=$(gcloud pubsub subscriptions list \
+PUSH_URL=$(gcloud pubsub subscriptions describe "$SUB" \
   --project="$PROJECT_ID" \
-  --format="value(name)" 2>/dev/null | head -20 | grep -v "^$" | head -1 || echo "")
-
-if [ -z "$SUB_NAME" ]; then
-  echo "⚠ No Pub/Sub subscriptions found — skipping endpoint check"
+  --format="value(pushConfig.pushEndpoint)" 2>/dev/null || echo "")
+echo "  Subscription: $SUB"
+echo "  Current endpoint: ${PUSH_URL:-none}"
+if [ "$PUSH_URL" != "$EXPECTED_URL" ]; then
+  echo "⚠ Endpoint mismatch — updating to $EXPECTED_URL"
+  gcloud pubsub subscriptions modify-push-config "$SUB" \
+    --push-endpoint="$EXPECTED_URL" \
+    --push-auth-service-account="classcharts-poller-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
+    --project="$PROJECT_ID"
+  echo "✅ Subscription endpoint updated"
 else
-  SUB_SHORT=$(basename "$SUB_NAME")
-  PUSH_URL=$(gcloud pubsub subscriptions describe "$SUB_SHORT" \
-    --project="$PROJECT_ID" \
-    --format="value(pushConfig.pushEndpoint)" 2>/dev/null || echo "")
-  echo "  Subscription: $SUB_SHORT"
-  echo "  Push endpoint: ${PUSH_URL:-none}"
-  if [ -z "$PUSH_URL" ]; then
-    echo "⚠ No push endpoint configured — this subscription may be pull-based"
-  elif [ "$PUSH_URL" != "$EXPECTED_URL" ]; then
-    echo "⚠ Push endpoint mismatch — updating..."
-    gcloud pubsub subscriptions modify-push-config "$SUB_SHORT" \
-      --push-endpoint="$EXPECTED_URL" \
-      --push-auth-service-account="classcharts-poller-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
-      --project="$PROJECT_ID"
-    echo "✅ Subscription push endpoint updated"
-  else
-    echo "✅ Subscription push endpoint correct"
-  fi
+  echo "✅ Subscription endpoint correct"
 fi
+
+# Publish a test message to trigger an immediate poll and verify the chain
+echo ""
+echo "▶ Publishing test message to verify trigger chain..."
+gcloud pubsub topics publish classcharts-poll \
+  --message='{"trigger":"scheduled"}' \
+  --project="$PROJECT_ID" \
+  && echo "✅ Test message published — poll should fire within 30s" \
+  || echo "⚠ Publish failed — check topic permissions"
