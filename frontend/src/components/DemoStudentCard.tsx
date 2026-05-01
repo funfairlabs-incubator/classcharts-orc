@@ -70,9 +70,9 @@ export function DemoStudentCard({ accent }: Props) {
       <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0 20px' }} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', borderTop: '1px solid var(--border)', margin: '0' }}>
         {[
-          { label: 'BEHAVIOUR', value: DEMO_STATS.behaviour, color: accent.color },
+          { label: 'BEHAVIOUR', value: DEMO_STATS.behaviour, sub: 'this week', color: accent.color },
           { label: 'HOMEWORK', value: DEMO_STATS.homework, sub: 'to do', color: accent.color },
-          { label: 'ATTENDANCE', value: `${DEMO_STATS.attendance}%`, color: 'var(--positive)' },
+          { label: 'ATTENDANCE', value: `${DEMO_STATS.attendance}%`, sub: '30 days', color: 'var(--positive)' },
           { label: 'LATEST NEWS', value: 'Sports Day', sub: 'Mrs K Jones', color: accent.color, small: true },
         ].map((stat, i) => (
           <div key={i} style={{

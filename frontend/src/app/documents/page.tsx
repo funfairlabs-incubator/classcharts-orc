@@ -68,7 +68,7 @@ export default function DocumentsPage() {
   return (
     <div style={styles.page}>
       <header style={styles.header}>
-        <p style={styles.eyebrow}>School</p>
+        <p style={styles.eyebrow}>{activePupil?.firstName ?? 'School'}</p>
         <h1 style={styles.title}>Documents</h1>
       </header>
 

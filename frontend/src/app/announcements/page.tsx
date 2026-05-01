@@ -18,7 +18,7 @@ export default function AnnouncementsPage() {
   return (
     <div style={styles.page}>
       <div style={{ marginBottom: 24 }}>
-        <p style={styles.eyebrow}>School</p>
+        <p style={styles.eyebrow}>{activePupil?.firstName ?? 'School'}</p>
         <h1 style={styles.pageTitle}>Announcements</h1>
       </div>
 
