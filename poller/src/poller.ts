@@ -17,6 +17,19 @@ export async function pollClassCharts(): Promise<void> {
 
   const pollErrors: string[] = [];
 
+  // Write "started" heartbeat immediately so we know the poller fired
+  try {
+    await writeHeartbeat({
+      polledAt: new Date().toISOString(),
+      pupils: [],
+      dependencies: { classcharts: 'ok', firestore: 'ok', anthropic: 'ok', pushover: 'ok' },
+      errors: ['Poll started — in progress'],
+    });
+    console.log('Start heartbeat written');
+  } catch (err) {
+    console.error('Failed to write start heartbeat:', err);
+  }
+
   const parents = await loginAllParents();
   console.log(`Logged in ${parents.length} parent(s), found ${parents.reduce((n, p) => n + p.pupils.length, 0)} unique pupil(s)`);
 
