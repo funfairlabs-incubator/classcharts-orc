@@ -41,7 +41,6 @@ const NAV = [
   { href: '/behaviour',     label: 'Behaviour',    icon: '★' },
   { href: '/announcements', label: 'Announcements',icon: '◉' },
   { href: '/documents',     label: 'Documents',    icon: '📎' },
-  { href: '/status',         label: 'Status',       icon: '⚡' },
   { href: '/architecture',  label: 'How it works', icon: '🔧' },
   { href: '/settings',      label: 'Settings',     icon: '⚙' },
 ];
