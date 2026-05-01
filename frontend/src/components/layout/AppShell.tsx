@@ -51,6 +51,19 @@ function AppShellInner({ children, session }: { children: React.ReactNode; sessi
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Apply saved theme colour on load
+  useEffect(() => {
+    try {
+      const tc = localStorage.getItem('themeColour');
+      if (tc) {
+        let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
+        if (!meta) { meta = document.createElement('meta') as HTMLMetaElement; meta.name = 'theme-color'; document.head.appendChild(meta); }
+        meta.content = tc;
+        document.documentElement.style.setProperty('--theme-colour', tc);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   // Close menu on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
