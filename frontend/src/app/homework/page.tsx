@@ -3,6 +3,13 @@ import { usePupil, useClassChartsData } from '@/lib/usePupil';
 import type { CCHomework } from '@classcharts/shared';
 import { useState, useEffect, useMemo } from 'react';
 
+const DEMO_HOMEWORK: CCHomework[] = [
+  { id: -1, title: 'Shakespeare essay — Romeo & Juliet', description: 'Write 500 words on the role of fate', subject: 'English', lesson: 'English', teacher: 'Mr J Thompson', issueDate: new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0], dueDate: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0], status: null, ticked: false, hasAttachments: false, attachments: [], links: [], completionTime: '45 mins' },
+  { id: -2, title: 'Algebra worksheet — equations', description: 'Complete exercises 1–20', subject: 'Maths', lesson: 'Maths', teacher: 'Mrs A Patel', issueDate: new Date(Date.now() - 5 * 86400000).toISOString().split('T')[0], dueDate: new Date(Date.now() + 1 * 86400000).toISOString().split('T')[0], status: null, ticked: false, hasAttachments: false, attachments: [], links: [], completionTime: '30 mins' },
+  { id: -3, title: 'Science revision — cell biology', description: 'Revise chapter 4 for test', subject: 'Science', lesson: 'Science', teacher: 'Dr R Evans', issueDate: new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0], dueDate: new Date(Date.now() - 1 * 86400000).toISOString().split('T')[0], status: 'late', ticked: false, hasAttachments: false, attachments: [], links: [], completionTime: '1 hour' },
+  { id: -4, title: 'History — source analysis', description: 'Analyse the two sources provided', subject: 'History', lesson: 'History', teacher: 'Miss L Davies', issueDate: new Date(Date.now() - 10 * 86400000).toISOString().split('T')[0], dueDate: new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0], status: 'completed', ticked: true, hasAttachments: false, attachments: [], links: [], completionTime: '40 mins' },
+];
+
 function useHomeworkData(pupilId: number | undefined) {
   const from = new Date(Date.now() - 14 * 86400000).toISOString().split('T')[0];
   const to   = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
@@ -58,7 +65,25 @@ export default function HomeworkPage() {
 
   const pupilA = pupils[0];
   const pupilB = pupils[1];
-  const hasMultiple = !!pupilB;
+
+  const [demoMode, setDemoMode] = useState(false);
+  const [demoPalette, setDemoPalette] = useState({ color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' });
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('demoMode') === 'true') setDemoMode(true);
+      const dp = localStorage.getItem('demoPalette');
+      if (dp) setDemoPalette(JSON.parse(dp));
+    } catch { /* ignore */ }
+    const h1 = (e: Event) => setDemoMode((e as CustomEvent).detail);
+    const h2 = (e: Event) => setDemoPalette((e as CustomEvent).detail);
+    window.addEventListener('demoModeChange', h1);
+    window.addEventListener('demoPaletteChange', h2);
+    return () => { window.removeEventListener('demoModeChange', h1); window.removeEventListener('demoPaletteChange', h2); };
+  }, []);
+
+  const hasDemo = demoMode && !pupilB;
+  const demoStudent = { id: -1, firstName: 'Demo' };
+  const hasMultiple = !!pupilB || hasDemo;
 
   const { data: hwA } = useHomeworkData(pupilA?.id);
   const { data: hwB } = useHomeworkData(pupilB?.id);
@@ -68,7 +93,8 @@ export default function HomeworkPage() {
   const all: TaggedHW[] = useMemo(() => [
     ...(hwA ?? []).map(h => ({ ...h, pupilId: pupilA?.id ?? 0, pupilName: pupilA?.firstName ?? '', pupilIdx: 0 })),
     ...(hwB ?? []).map(h => ({ ...h, pupilId: pupilB?.id ?? 0, pupilName: pupilB?.firstName ?? '', pupilIdx: 1 })),
-  ], [hwA, hwB, pupilA, pupilB]);
+    ...(hasDemo ? DEMO_HOMEWORK.map(h => ({ ...h, pupilId: -1, pupilName: 'Demo', pupilIdx: 1 })) : []),
+  ], [hwA, hwB, pupilA, pupilB, hasDemo]);
 
   // Filter state
   const [filterStudent, setFilterStudent] = useState<number | 'all'>('all');
@@ -92,15 +118,19 @@ export default function HomeworkPage() {
   const summary = useMemo(() => {
     const rows = pupils.map((pupil, idx) => {
       const hw = idx === 0 ? (hwA ?? []) : (hwB ?? []);
-      return {
-        pupil, idx,
+      return { pupil, idx, accent: accentFor(pupil.id, idx),
         late:      hw.filter(h => hwStatus(h) === 'late').length,
         todo:      hw.filter(h => hwStatus(h) === 'todo').length,
         completed: hw.filter(h => hwStatus(h) === 'completed').length,
       };
     });
+    if (hasDemo) rows.push({ pupil: demoStudent as any, idx: 1, accent: demoPalette,
+      late:      DEMO_HOMEWORK.filter(h => hwStatus(h) === 'late').length,
+      todo:      DEMO_HOMEWORK.filter(h => hwStatus(h) === 'todo').length,
+      completed: DEMO_HOMEWORK.filter(h => hwStatus(h) === 'completed').length,
+    });
     return rows;
-  }, [pupils, hwA, hwB]);
+  }, [pupils, hwA, hwB, hasDemo, demoPalette]);
 
   const isNew = (h: CCHomework) => new Date(h.issueDate).getTime() > Date.now() - 2 * 86400000;
 
