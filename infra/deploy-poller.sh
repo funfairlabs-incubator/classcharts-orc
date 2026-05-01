@@ -63,13 +63,31 @@ echo "✅ IAM binding confirmed"
 # Verify Pub/Sub subscription push endpoint is correct
 echo ""
 echo "▶ Verifying Pub/Sub subscription..."
-PUSH_URL=$(gcloud pubsub subscriptions describe classcharts-poll-sub   --project="$PROJECT_ID"   --format="value(pushConfig.pushEndpoint)" 2>/dev/null || echo "not found")
 EXPECTED_URL="https://classcharts-poller-306745837103.europe-west2.run.app/"
-if [ "$PUSH_URL" != "$EXPECTED_URL" ]; then
-  echo "⚠ Push endpoint mismatch: $PUSH_URL"
-  echo "  Updating to: $EXPECTED_URL"
-  gcloud pubsub subscriptions modify-push-config classcharts-poll-sub     --push-endpoint="$EXPECTED_URL"     --push-auth-service-account="classcharts-poller-sa@${PROJECT_ID}.iam.gserviceaccount.com"     --project="$PROJECT_ID"
-  echo "✅ Subscription push endpoint updated"
+
+# Find subscription name dynamically
+SUB_NAME=$(gcloud pubsub subscriptions list \
+  --project="$PROJECT_ID" \
+  --format="value(name)" 2>/dev/null | grep -i "classcharts" | head -1 || echo "")
+
+if [ -z "$SUB_NAME" ]; then
+  echo "⚠ No ClassCharts Pub/Sub subscription found — skipping endpoint check"
 else
-  echo "✅ Subscription push endpoint correct: $PUSH_URL"
+  SUB_SHORT=$(basename "$SUB_NAME")
+  PUSH_URL=$(gcloud pubsub subscriptions describe "$SUB_SHORT" \
+    --project="$PROJECT_ID" \
+    --format="value(pushConfig.pushEndpoint)" 2>/dev/null || echo "")
+  echo "  Subscription: $SUB_SHORT"
+  echo "  Push endpoint: ${PUSH_URL:-none}"
+  if [ "$PUSH_URL" != "$EXPECTED_URL" ]; then
+    echo "⚠ Push endpoint mismatch — updating..."
+    gcloud pubsub subscriptions modify-push-config "$SUB_SHORT" \
+      --push-endpoint="$EXPECTED_URL" \
+      --push-auth-service-account="classcharts-poller-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
+      --project="$PROJECT_ID"
+    echo "✅ Subscription push endpoint updated"
+  else
+    echo "✅ Subscription push endpoint correct"
+  fi
+fi
 fi

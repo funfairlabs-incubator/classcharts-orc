@@ -294,10 +294,15 @@ ${(err as any)?.stack ?? ''}`,
     polledAt: new Date().toISOString(),
     pupils: allStudents.map(s => s.name),
     dependencies: {
-      classcharts: pollErrors.some(e => e.includes('login') || e.includes('TES') || e.includes('401') || e.includes('403')) ? 'error' : 'ok',
-      firestore: pollErrors.some(e => e.includes('Firestore') || e.includes('firestore')) ? 'error' : 'ok',
-      anthropic: pollErrors.some(e => e.includes('Anthropic') || e.includes('claude') || e.includes('summarise')) ? 'error' : 'ok',
-      pushover: pollErrors.some(e => e.includes('Pushover') || e.includes('pushover')) ? 'error' : 'ok',
+      classcharts:    pollErrors.some(e => e.includes('login') || e.includes('TES') || e.includes('401') || e.includes('403')) ? 'error' : 'ok',
+      firestore:      pollErrors.some(e => e.includes('Firestore') || e.includes('firestore')) ? 'error' : 'ok',
+      gcs:            pollErrors.some(e => e.includes('Storage') || e.includes('GCS') || e.includes('bucket') || e.includes('attachment')) ? 'error' : 'ok',
+      pubsub:         'ok', // If poller ran, Pub/Sub delivered successfully
+      anthropic:      pollErrors.some(e => e.includes('Anthropic') || e.includes('claude') || e.includes('summarise')) ? 'error' : 'ok',
+      pushover:       pollErrors.some(e => e.includes('Pushover') || e.includes('pushover')) ? 'error' : 'ok',
+      gcal:           pollErrors.some(e => e.includes('Calendar') || e.includes('calendar') || e.includes('calendarConfig')) ? 'error' : 'ok',
+      gtasks:         pollErrors.some(e => e.includes('Task') || e.includes('task') || e.includes('tasksConfig')) ? 'error' : 'ok',
+      secretmanager:  'ok', // If poller started, secrets were read successfully
     },
     errors: pollErrors.length > 0 ? pollErrors.slice(-10) : undefined,
   });
