@@ -275,7 +275,7 @@ export default function DayPage() {
                 {(d as any).overallPct?.toFixed(0) ?? '—'}%
               </div>
               <div style={{ fontSize: 9, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>{(p as any).firstName}</div>
-              <div style={{ fontSize: 8, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>this year</div>
+              <div style={{ fontSize: 8, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>overall</div>
             </div>
           ))}
         </div>
