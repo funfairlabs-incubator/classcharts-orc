@@ -239,24 +239,39 @@ export default function DayPage() {
   // Use pupil A's timetable as the time spine (same bell times for same school)
   // If only one pupil, just show single column
   const singlePupil = !pupilB && !hasDemo;
-  // Demo lessons: if real timetable loaded mirror its bell times, otherwise use fixed All Saints' schedule
-  const DEMO_SUBJECTS = ['English', 'Maths', 'Science', 'History', 'PE', 'Art', 'Spanish'];
-  const DEMO_TEACHERS = ['Mr J Thompson', 'Mrs A Patel', 'Dr R Evans', 'Miss L Davies', 'Mr S Wilson', 'Mrs K Jones', 'Mrs N Lopez'];
-  const DEMO_ROOMS    = ['B12', 'C04', 'Lab 2', 'A07', 'Sports Hall', 'D03', 'B08'];
-  const FIXED_DEMO_LESSONS: CCLesson[] = [
-    { subjectName: 'English',  teacherName: 'Mr J Thompson', roomName: 'B12',         periodName: '1', periodNumber: '1', startTime: '08:30', endTime: '09:30', isBreak: false, isAlternative: false, pupilNote: '', lessonName: '', date: selectedDate },
-    { subjectName: '',         teacherName: '',               roomName: '',            periodName: 'Break', periodNumber: '', startTime: '09:30', endTime: '09:50', isBreak: true,  isAlternative: false, pupilNote: '', lessonName: 'Break', date: selectedDate },
-    { subjectName: 'Maths',    teacherName: 'Mrs A Patel',   roomName: 'C04',         periodName: '2', periodNumber: '2', startTime: '09:50', endTime: '10:50', isBreak: false, isAlternative: false, pupilNote: '', lessonName: '', date: selectedDate },
-    { subjectName: 'Science',  teacherName: 'Dr R Evans',    roomName: 'Lab 2',       periodName: '3', periodNumber: '3', startTime: '10:50', endTime: '11:50', isBreak: false, isAlternative: false, pupilNote: '', lessonName: '', date: selectedDate },
-    { subjectName: '',         teacherName: '',               roomName: '',            periodName: 'Lunch', periodNumber: '', startTime: '11:50', endTime: '12:40', isBreak: true,  isAlternative: false, pupilNote: '', lessonName: 'Lunch', date: selectedDate },
-    { subjectName: 'History',  teacherName: 'Miss L Davies', roomName: 'A07',         periodName: '4', periodNumber: '4', startTime: '12:40', endTime: '13:40', isBreak: false, isAlternative: false, pupilNote: '', lessonName: '', date: selectedDate },
-    { subjectName: 'PE',       teacherName: 'Mr S Wilson',   roomName: 'Sports Hall', periodName: '5', periodNumber: '5', startTime: '13:40', endTime: '14:40', isBreak: false, isAlternative: false, pupilNote: '', lessonName: '', date: selectedDate },
-  ];
-  const demoLessons: CCLesson[] = hasDemo ? (
-    dataA.lessons.length > 0
-      ? dataA.lessons.map((l, i) => l.isBreak ? { ...l } : { ...l, subjectName: DEMO_SUBJECTS[i % 7], teacherName: DEMO_TEACHERS[i % 7], roomName: DEMO_ROOMS[i % 7], lessonName: '' })
-      : FIXED_DEMO_LESSONS
-  ) : [];
+  // Demo timetable — fixed schedule every day, mirroring real school bell times where available
+  const buildDemoLessons = (spine: CCLesson[], date: string): CCLesson[] => {
+    const PERIODS = [
+      { subjectName: 'Tutorial',  teacherName: 'Mrs E McHenry', roomName: 'E18',         periodName: 'REG', periodNumber: '' },
+      { subjectName: 'Maths',     teacherName: 'Mrs A Patel',   roomName: 'C04',         periodName: '1',   periodNumber: '1' },
+      { subjectName: 'English',   teacherName: 'Mr J Thompson', roomName: 'B12',         periodName: '2',   periodNumber: '2' },
+      { subjectName: 'Science',   teacherName: 'Dr R Evans',    roomName: 'Lab 2',       periodName: '3',   periodNumber: '3' },
+      { subjectName: 'Computing', teacherName: 'Mr D Clarke',   roomName: 'IT Suite',    periodName: '4',   periodNumber: '4' },
+      { subjectName: 'PE',        teacherName: 'Mr S Wilson',   roomName: 'Sports Hall', periodName: '5',   periodNumber: '5' },
+    ];
+    if (spine.length > 0) {
+      // Map onto real timetable structure (preserving breaks)
+      let periodIdx = 0;
+      return spine.map(l => {
+        if (l.isBreak) return { ...l };
+        const p = PERIODS[periodIdx % PERIODS.length];
+        periodIdx++;
+        return { ...l, ...p, lessonName: '' };
+      });
+    }
+    // Fallback fixed schedule matching All Saints' typical day
+    return [
+      { subjectName: 'Tutorial',  teacherName: 'Mrs E McHenry', roomName: 'E18',         periodName: 'REG', periodNumber: '',  startTime: '08:30', endTime: '08:50', isBreak: false, isAlternative: false, pupilNote: '', lessonName: '', date },
+      { subjectName: 'Maths',     teacherName: 'Mrs A Patel',   roomName: 'C04',         periodName: '1',   periodNumber: '1', startTime: '08:50', endTime: '09:50', isBreak: false, isAlternative: false, pupilNote: '', lessonName: '', date },
+      { subjectName: '',          teacherName: '',               roomName: '',            periodName: 'Break', periodNumber: '', startTime: '09:50', endTime: '10:10', isBreak: true,  isAlternative: false, pupilNote: '', lessonName: 'Break', date },
+      { subjectName: 'English',   teacherName: 'Mr J Thompson', roomName: 'B12',         periodName: '2',   periodNumber: '2', startTime: '10:10', endTime: '11:10', isBreak: false, isAlternative: false, pupilNote: '', lessonName: '', date },
+      { subjectName: 'Science',   teacherName: 'Dr R Evans',    roomName: 'Lab 2',       periodName: '3',   periodNumber: '3', startTime: '11:10', endTime: '12:10', isBreak: false, isAlternative: false, pupilNote: '', lessonName: '', date },
+      { subjectName: '',          teacherName: '',               roomName: '',            periodName: 'Lunch', periodNumber: '', startTime: '12:10', endTime: '13:00', isBreak: true,  isAlternative: false, pupilNote: '', lessonName: 'Lunch', date },
+      { subjectName: 'Computing', teacherName: 'Mr D Clarke',   roomName: 'IT Suite',    periodName: '4',   periodNumber: '4', startTime: '13:00', endTime: '14:00', isBreak: false, isAlternative: false, pupilNote: '', lessonName: '', date },
+      { subjectName: 'PE',        teacherName: 'Mr S Wilson',   roomName: 'Sports Hall', periodName: '5',   periodNumber: '5', startTime: '14:00', endTime: '15:00', isBreak: false, isAlternative: false, pupilNote: '', lessonName: '', date },
+    ] as CCLesson[];
+  };
+  const demoLessons: CCLesson[] = hasDemo ? buildDemoLessons(dataA.lessons, selectedDate) : [];
   const bLessons = pupilB ? dataB.lessons : (hasDemo ? demoLessons : []);
   const rows = singlePupil ? [] : mergeByTime(dataA.lessons, bLessons);
 
