@@ -139,7 +139,7 @@ function usePupilDay(pupilId: number | undefined, date: string, today: string) {
     { pupilId: String(pupilId ?? ''), date },
     [pupilId, date],
   );
-  const from = new Date(Date.now() - 60 * 86400000).toISOString().split('T')[0];
+  const from = `${new Date().getFullYear()}-01-01`; // calendar year for accurate overall %
   const { data: attendance } = useClassChartsData<CCAttendanceSummary>(
     'attendance',
     { pupilId: String(pupilId ?? ''), from, to: today },
@@ -214,16 +214,42 @@ export default function DayPage() {
   const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
   const weekDays = getWeekDays(selectedDate);
 
+  const [demoMode, setDemoMode] = useState(false);
+  const [demoPalette, setDemoPalette] = useState({ color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' });
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('demoMode') === 'true') setDemoMode(true);
+      const dp = localStorage.getItem('demoPalette');
+      if (dp) setDemoPalette(JSON.parse(dp));
+    } catch { /* ignore */ }
+    const h1 = (e: Event) => setDemoMode((e as CustomEvent).detail);
+    const h2 = (e: Event) => setDemoPalette((e as CustomEvent).detail);
+    window.addEventListener('demoModeChange', h1);
+    window.addEventListener('demoPaletteChange', h2);
+    return () => { window.removeEventListener('demoModeChange', h1); window.removeEventListener('demoPaletteChange', h2); };
+  }, []);
+
   const pupilA = pupils[0];
   const pupilB = pupils[1];
+  const hasDemo = demoMode && !pupilB;
 
   const dataA = usePupilDay(pupilA?.id, selectedDate, today);
   const dataB = usePupilDay(pupilB?.id, selectedDate, today);
 
   // Use pupil A's timetable as the time spine (same bell times for same school)
   // If only one pupil, just show single column
-  const singlePupil = !pupilB;
-  const rows = singlePupil ? [] : mergeByTime(dataA.lessons, dataB.lessons);
+  const singlePupil = !pupilB && !hasDemo;
+  const demoLessons = hasDemo ? [
+    { subjectName: 'English',  teacherName: 'Mr J Thompson', roomName: 'B12',        periodName: '1', periodNumber: '1', startTime: '08:50', endTime: '09:50', isBreak: false, isAlternative: false, pupilNote: '', lessonName: null },
+    { subjectName: '',         teacherName: '',               roomName: '',           periodName: 'Break', periodNumber: '', startTime: '09:50', endTime: '10:10', isBreak: true,  isAlternative: false, pupilNote: '', lessonName: 'Break' },
+    { subjectName: 'Maths',    teacherName: 'Mrs A Patel',   roomName: 'C04',        periodName: '2', periodNumber: '2', startTime: '10:10', endTime: '11:10', isBreak: false, isAlternative: false, pupilNote: '', lessonName: null },
+    { subjectName: 'Science',  teacherName: 'Dr R Evans',    roomName: 'Lab 2',      periodName: '3', periodNumber: '3', startTime: '11:10', endTime: '12:10', isBreak: false, isAlternative: false, pupilNote: '', lessonName: null },
+    { subjectName: '',         teacherName: '',               roomName: '',           periodName: 'Lunch', periodNumber: '', startTime: '12:10', endTime: '13:00', isBreak: true,  isAlternative: false, pupilNote: '', lessonName: 'Lunch' },
+    { subjectName: 'History',  teacherName: 'Miss L Davies', roomName: 'A07',        periodName: '4', periodNumber: '4', startTime: '13:00', endTime: '14:00', isBreak: false, isAlternative: false, pupilNote: '', lessonName: null },
+    { subjectName: 'PE',       teacherName: 'Mr S Wilson',   roomName: 'Sports Hall', periodName: '5', periodNumber: '5', startTime: '14:00', endTime: '15:00', isBreak: false, isAlternative: false, pupilNote: '', lessonName: null },
+  ] : [];
+  const bLessons = pupilB ? dataB.lessons : (hasDemo ? demoLessons : []);
+  const rows = singlePupil ? [] : mergeByTime(dataA.lessons, bLessons);
 
   // Accent colours
   const accentA = 'var(--accent, #6366f1)';
@@ -238,13 +264,18 @@ export default function DayPage() {
             {new Date(selectedDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}
           </h1>
         </div>
-        <div style={{ textAlign: 'right', display: 'flex', gap: 12 }}>
-          {[{ p: pupilA, d: dataA }, { p: pupilB, d: dataB }].filter(x => x.p).map(({ p, d }) => (
-            <div key={p!.id}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: d.overallPct == null ? 'var(--text-3)' : d.overallPct >= 95 ? 'var(--positive)' : d.overallPct >= 90 ? 'var(--warning)' : 'var(--negative)' }}>
-                {d.overallPct?.toFixed(0) ?? '—'}%
+        <div style={{ textAlign: 'right', display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+          {[
+            { p: pupilA, d: dataA },
+            ...(pupilB ? [{ p: pupilB, d: dataB }] : []),
+            ...(hasDemo ? [{ p: { id: -1, firstName: 'Demo' }, d: { overallPct: 98 } }] : []),
+          ].filter(x => x.p).map(({ p, d }) => (
+            <div key={(p as any).id} style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: (d as any).overallPct == null ? 'var(--text-3)' : (d as any).overallPct >= 95 ? 'var(--positive)' : (d as any).overallPct >= 90 ? 'var(--warning)' : 'var(--negative)' }}>
+                {(d as any).overallPct?.toFixed(0) ?? '—'}%
               </div>
-              <div style={{ fontSize: 9, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>{p!.firstName}</div>
+              <div style={{ fontSize: 9, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>{(p as any).firstName}</div>
+              <div style={{ fontSize: 8, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>cal. year</div>
             </div>
           ))}
         </div>
@@ -281,11 +312,13 @@ export default function DayPage() {
                 <SessionBand label="PM" session={dataA.pmSession} />
               </div>
             </div>
-            {pupilB && <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{pupilB.firstName}</div>
+            {(pupilB || hasDemo) && <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                {pupilB?.firstName ?? 'Demo'}{hasDemo && <span style={{ fontSize: 8, marginLeft: 4, opacity: 0.6 }}>DEMO</span>}
+              </div>
               <div style={{ display: 'flex', gap: 4 }}>
-                <SessionBand label="AM" session={dataB.amSession} />
-                <SessionBand label="PM" session={dataB.pmSession} />
+                <SessionBand label="AM" session={hasDemo ? { status: 'present', lateMinutes: 0 } : dataB.amSession} />
+                <SessionBand label="PM" session={hasDemo ? { status: 'present', lateMinutes: 0 } : dataB.pmSession} />
               </div>
             </div>}
           </div>
@@ -332,7 +365,7 @@ export default function DayPage() {
                   {/* Pupil B */}
                   <LessonCell
                     lesson={row.b}
-                    att={row.bIdx >= 0 ? dataB.periodMap.get(row.bIdx) : undefined}
+                    att={row.bIdx >= 0 && !hasDemo ? dataB.periodMap.get(row.bIdx) : undefined}
                     isCurrent={isCurrent}
                     isPast={isPast}
                   />
