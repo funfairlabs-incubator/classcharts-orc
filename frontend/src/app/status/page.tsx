@@ -87,9 +87,17 @@ export default function StatusPage() {
       {!loading && !hb && (
         <div className="card" style={{ padding: 24, textAlign: 'center' }}>
           <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>No heartbeat data</p>
-          <p style={{ fontSize: 13, color: 'var(--text-2)' }}>
-            The poller has not written a status record yet. Wait for the next poll cycle (~5 mins).
+          <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 16 }}>
+            The poller has not written a status record yet.
           </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <button onClick={load} style={{ fontSize: 12, padding: '6px 14px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--surface)', cursor: 'pointer', color: 'var(--text-2)' }}>
+              Refresh
+            </button>
+            <button onClick={triggerPoll} disabled={triggering} style={{ fontSize: 12, padding: '6px 14px', border: 'none', borderRadius: 6, background: 'var(--accent, #6366f1)', color: '#fff', cursor: triggering ? 'default' : 'pointer', opacity: triggering ? 0.7 : 1 }}>
+              {triggering ? 'Polling…' : 'Trigger poll now'}
+            </button>
+          </div>
         </div>
       )}
 
