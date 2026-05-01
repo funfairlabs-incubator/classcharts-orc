@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Footer } from './Footer';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
-import { PupilProvider } from '@/lib/usePupil';
+import { PupilProvider, usePupil } from '@/lib/usePupil';
 
 export function AppShell({ children, session }: { children: React.ReactNode; session: any }) {
   const { data: clientSession } = useSession();
@@ -49,6 +49,7 @@ const NAV = [
 function AppShellInner({ children, session }: { children: React.ReactNode; session: any }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { pupils, activePupil, setActivePupilId } = usePupil();
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Apply saved theme colour on load
@@ -109,6 +110,27 @@ function AppShellInner({ children, session }: { children: React.ReactNode; sessi
               <div style={styles.dropdownHeader}>
                 <p style={styles.dropdownEmail}>{session.user?.email}</p>
               </div>
+              {/* Student switcher */}
+              {pupils.length > 1 && (
+                <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: 6 }}>Viewing</p>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {pupils.map(p => (
+                      <button key={p.id} onClick={() => { setActivePupilId(p.id); setMenuOpen(false); }} style={{
+                        padding: '4px 10px', borderRadius: 100, fontSize: 12, fontWeight: 600,
+                        border: '1px solid',
+                        borderColor: activePupil?.id === p.id ? 'var(--accent, #6366f1)' : 'var(--border)',
+                        background: activePupil?.id === p.id ? 'var(--accent, #6366f1)' : 'transparent',
+                        color: activePupil?.id === p.id ? '#fff' : 'var(--text-2)',
+                        cursor: 'pointer',
+                      }}>
+                        {p.firstName}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {NAV.map(({ href, label, icon }) => {
                 const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
                 return (
