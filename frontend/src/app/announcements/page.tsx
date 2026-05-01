@@ -26,6 +26,8 @@ function usePupilAnnouncements(pupilId: number | undefined) {
 
 export default function AnnouncementsPage() {
   const { pupils } = usePupil();
+  const [filterStudent, setFilterStudent] = useState<number | 'all'>('all');
+  const [search, setSearch] = useState('');
 
   // Load saved palettes to colour student pills
   const [savedPalettes, setSavedPalettes] = useState<Record<number, { color: string; bg: string; border: string }>>({});
@@ -76,6 +78,18 @@ export default function AnnouncementsPage() {
     return new Date(tb).getTime() - new Date(ta).getTime();
   });
 
+  const filtered = sorted.filter(({ ann, pupils: annPupils }) => {
+    if (filterStudent !== 'all' && !annPupils.some(({ pupil }) => pupil?.id === filterStudent)) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return ann.title.toLowerCase().includes(q) ||
+        ann.teacherName?.toLowerCase().includes(q) ||
+        ann.descriptionText?.toLowerCase().includes(q) ||
+        (ann as any).aiSummary?.toLowerCase().includes(q);
+    }
+    return true;
+  });
+
   const consentPending = sorted.filter(({ ann }) => ann.requiresConsent && ann.consentGiven === null);
 
   return (
@@ -83,6 +97,31 @@ export default function AnnouncementsPage() {
       <div style={{ marginBottom: 16 }}>
         <p style={styles.eyebrow}>School</p>
         <h1 style={styles.pageTitle}>Announcements</h1>
+      </div>
+
+      {/* Student filter + search */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+        {pupils.length > 1 && (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            <button onClick={() => setFilterStudent('all')} style={{ ...styles.filterBtn, ...(filterStudent === 'all' ? styles.filterBtnActive : {}) }}>All</button>
+            {pupils.map((p, idx) => {
+              const acc = savedPalettes[p.id] ?? DEFAULT_ACCENTS[idx % DEFAULT_ACCENTS.length];
+              return (
+                <button key={p.id} onClick={() => setFilterStudent(filterStudent === p.id ? 'all' : p.id)} style={{
+                  ...styles.filterBtn,
+                  ...(filterStudent === p.id ? { background: acc.bg, color: acc.color, borderColor: acc.color } : {}),
+                }}>{p.firstName}</button>
+              );
+            })}
+          </div>
+        )}
+        <input
+          type="search"
+          placeholder="Search announcements…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={styles.searchBox}
+        />
       </div>
 
       {/* Consent banner */}
@@ -97,7 +136,7 @@ export default function AnnouncementsPage() {
         </a>
       )}
 
-      {sorted.map(({ ann, pupils: annPupils }) => {
+      {filtered.map(({ ann, pupils: annPupils }) => {
         const archived = isArchived(ann);
         const accent = annPupils.length === 1 ? accentFor(annPupils[0].pupil?.id ?? 0, annPupils[0].idx) : { color: 'var(--text-2)', bg: 'var(--surface-2)', border: 'var(--border)' };
 
@@ -186,17 +225,26 @@ export default function AnnouncementsPage() {
         );
       })}
 
-      {sorted.length === 0 && (
+      {filtered.length === 0 && (
         <p style={{ fontSize: 13, color: 'var(--text-3)', textAlign: 'center', marginTop: 48 }}>No announcements</p>
       )}
     </div>
   );
 }
 
+const DEFAULT_ACCENTS = [
+  { color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
+  { color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' },
+  { color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
+];
+
 const styles: Record<string, React.CSSProperties> = {
   page: { maxWidth: 640, margin: '0 auto', padding: '12px 12px 56px' },
   eyebrow: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 2 },
   pageTitle: { fontSize: 22, fontWeight: 700 },
+  filterBtn: { fontSize: 11, padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 100, background: 'transparent', cursor: 'pointer', color: 'var(--text-2)', fontFamily: 'var(--font-body)' },
+  filterBtnActive: { background: 'var(--surface-2)', color: 'var(--text)', borderColor: 'var(--text-2)', fontWeight: 600 },
+  searchBox: { width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, background: 'var(--surface)', color: 'var(--text)', outline: 'none', boxSizing: 'border-box' as const },
   consentBanner: { display: 'block', padding: '12px 16px', background: 'var(--warning-bg)', border: '1px solid var(--warning)', borderRadius: 8, marginBottom: 16, textDecoration: 'none' },
   annTitle: { fontSize: 15, fontWeight: 600, marginBottom: 2 },
   annMeta: { fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
