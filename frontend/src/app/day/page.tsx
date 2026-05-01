@@ -139,7 +139,7 @@ function usePupilDay(pupilId: number | undefined, date: string, today: string) {
     { pupilId: String(pupilId ?? ''), date },
     [pupilId, date],
   );
-  const from = new Date(Date.now() - 60 * 86400000).toISOString().split('T')[0];
+  const from = `${new Date().getFullYear()}-01-01`; // calendar year for accurate overall %
   const { data: attendance } = useClassChartsData<CCAttendanceSummary>(
     'attendance',
     { pupilId: String(pupilId ?? ''), from, to: today },
