@@ -27,7 +27,7 @@ app.post('/', async (req, res) => {
   }
 });
 
-app.get('/health', (_req, res) => res.json({ ok: true }));
+app.get('/health', (_req, res) => res.json({ ok: true, version: '2' }));
 
 const PORT = process.env.PORT ?? 8080;
 app.listen(PORT, () => console.log(`Poller listening on :${PORT}`));
