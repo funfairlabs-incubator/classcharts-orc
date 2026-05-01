@@ -27,6 +27,17 @@ const DEFAULT_PREFS: NotificationPrefs = {
   behaviour: true, detentions: true, attendance: true, announcements: true,
 };
 
+const THEME_COLOURS = [
+  { label: 'Orange',  color: '#f97316' },
+  { label: 'Violet',  color: '#6366f1' },
+  { label: 'Blue',    color: '#1d4ed8' },
+  { label: 'Green',   color: '#15803d' },
+  { label: 'Rose',    color: '#be185d' },
+  { label: 'Teal',    color: '#0f766e' },
+  { label: 'Slate',   color: '#475569' },
+  { label: 'Black',   color: '#0a0a0a' },
+];
+
 const PALETTE_PRESETS = [
   { label: 'Blue',    color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
   { label: 'Amber',   color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
@@ -48,11 +59,16 @@ export default function SettingsPage() {
   const [testing, setTesting] = useState<'idle'|'sending'|'ok'|'error'>('idle');
   const { pupils } = usePupil();
   const [palettes, setPalettes] = useState<Record<number, typeof PALETTE_PRESETS[0]>>({});
+  const [themeColour, setThemeColour] = useState('#f97316');
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem('pupilPalettes');
       if (saved) setPalettes(JSON.parse(saved));
+    } catch { /* ignore */ }
+    try {
+      const tc = localStorage.getItem('themeColour');
+      if (tc) { setThemeColour(tc); applyThemeColour(tc); }
     } catch { /* ignore */ }
     fetch('/api/settings/prefs')
       .then(r => r.json())
@@ -71,6 +87,25 @@ export default function SettingsPage() {
       setTesting(res.ok ? 'ok' : 'error');
     } catch { setTesting('error'); }
     setTimeout(() => setTesting('idle'), 4000);
+  }
+
+  function applyThemeColour(colour: string) {
+    // Update the meta theme-color tag for PWA status bar
+    let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement;
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'theme-color';
+      document.head.appendChild(meta);
+    }
+    meta.content = colour;
+    // Also update the nav bar background via CSS variable
+    document.documentElement.style.setProperty('--theme-colour', colour);
+  }
+
+  function setTheme(colour: string) {
+    setThemeColour(colour);
+    applyThemeColour(colour);
+    try { localStorage.setItem('themeColour', colour); } catch { /* ignore */ }
   }
 
   function setPupilPalette(pupilId: number, preset: typeof PALETTE_PRESETS[0]) {
@@ -170,6 +205,22 @@ export default function SettingsPage() {
         <div className="card" style={styles.section}>
           <h2 style={styles.sectionTitle}>Card Colours</h2>
           <p style={styles.sectionDesc}>Choose an accent colour for each child's card on the dashboard.</p>
+
+          {/* Theme colour */}
+          <div style={{ marginBottom: 24 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>App theme colour</p>
+            <p style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 12 }}>Sets the PWA status bar and header accent.</p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {THEME_COLOURS.map(tc => (
+                <button key={tc.color} onClick={() => setTheme(tc.color)} title={tc.label} style={{
+                  width: 32, height: 32, borderRadius: '50%', background: tc.color, border: 'none', cursor: 'pointer',
+                  outline: themeColour === tc.color ? `3px solid ${tc.color}` : 'none',
+                  outlineOffset: 2,
+                  boxShadow: themeColour === tc.color ? '0 0 0 2px var(--bg), 0 0 0 4px ' + tc.color : 'none',
+                }} />
+              ))}
+            </div>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {pupils.map(pupil => {
               const current = palettes[pupil.id] ?? PALETTE_PRESETS[0];
