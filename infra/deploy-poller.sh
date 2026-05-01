@@ -10,11 +10,31 @@ IMAGE="gcr.io/${PROJECT_ID}/${SERVICE}"
 echo "▶ Building and pushing Docker image..."
 cd "$(dirname "$0")/.."
 
-gcloud builds submit \
+# Submit build and wait for completion without streaming logs
+# (SA lacks roles/logging.viewer needed to stream)
+BUILD_ID=$(gcloud builds submit \
   --config cloudbuild.yaml \
   --substitutions="_IMAGE=${IMAGE}" \
-  --suppress-logs \
-  .
+  --async \
+  --format='value(id)' \
+  .)
+
+echo "▶ Build submitted: ${BUILD_ID}"
+echo "  Logs: https://console.cloud.google.com/cloud-build/builds/${BUILD_ID}?project=${PROJECT_ID}"
+
+# Poll until complete
+echo "▶ Waiting for build..."
+while true; do
+  STATUS=$(gcloud builds describe "${BUILD_ID}" --format='value(status)' 2>/dev/null)
+  echo "  Status: ${STATUS}"
+  if [ "$STATUS" = "SUCCESS" ]; then break; fi
+  if [ "$STATUS" = "FAILURE" ] || [ "$STATUS" = "CANCELLED" ] || [ "$STATUS" = "TIMEOUT" ]; then
+    echo "ERROR: Build ${BUILD_ID} failed with status ${STATUS}"
+    echo "  View logs: https://console.cloud.google.com/cloud-build/builds/${BUILD_ID}?project=${PROJECT_ID}"
+    exit 1
+  fi
+  sleep 10
+done
 
 echo "▶ Deploying to Cloud Run..."
 gcloud run deploy "$SERVICE" \

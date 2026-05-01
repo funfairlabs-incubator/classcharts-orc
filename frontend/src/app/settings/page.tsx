@@ -60,6 +60,25 @@ export default function SettingsPage() {
   const { pupils } = usePupil();
   const [palettes, setPalettes] = useState<Record<number, typeof PALETTE_PRESETS[0]>>({});
   const [themeColour, setThemeColour] = useState('#f97316');
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    // Check if already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) setIsInstalled(true);
+    // Capture install prompt
+    const handler = (e: Event) => { e.preventDefault(); setInstallPrompt(e); };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  async function installApp() {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') setIsInstalled(true);
+    setInstallPrompt(null);
+  }
   const [demoMode, setDemoMode] = useState(false);
   const [demoPalette, setDemoPalette] = useState(PALETTE_PRESETS[2]); // Green default
 
@@ -228,6 +247,28 @@ export default function SettingsPage() {
         <div className="card" style={styles.section}>
           <h2 style={styles.sectionTitle}>Card Colours</h2>
           <p style={styles.sectionDesc}>Choose an accent colour for each child's card on the dashboard.</p>
+
+          {/* Install app */}
+          <div style={{ marginBottom: 24, padding: '12px 16px', background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+            <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Install app</p>
+            {isInstalled ? (
+              <p style={{ fontSize: 12, color: 'var(--positive)' }}>✓ App is installed</p>
+            ) : installPrompt ? (
+              <>
+                <p style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 8 }}>Add ClassCharts to your home screen for the best experience.</p>
+                <button onClick={installApp} style={{
+                  padding: '8px 16px', background: 'var(--accent, #6366f1)', color: '#fff',
+                  border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}>
+                  Add to Home Screen
+                </button>
+              </>
+            ) : (
+              <p style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.5 }}>
+                To install: tap the share icon in your browser and choose <strong>Add to Home Screen</strong>.
+              </p>
+            )}
+          </div>
 
           {/* Demo mode */}
           <div style={{ marginBottom: 24, padding: '12px 16px', background: demoMode ? 'var(--surface-2)' : 'transparent', borderRadius: 8, border: '1px solid var(--border)' }}>
