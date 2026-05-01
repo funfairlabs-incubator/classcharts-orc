@@ -6,11 +6,11 @@ import { useState, useEffect } from 'react';
 interface BehaviourData { activity: CCActivityPoint[]; summary: CCBehaviourSummary; }
 
 const DEMO_ACTIVITY: CCActivityPoint[] = [
-  { id: -1, score: 2,  reason: 'Excellent class contribution', lessonName: 'English',  teacherName: 'Mr J Thompson', timestamp: new Date(Date.now() - 1  * 86400000).toISOString(), polarity: 'positive' },
-  { id: -2, score: 1,  reason: 'Good homework submission',     lessonName: 'Maths',    teacherName: 'Mrs A Patel',   timestamp: new Date(Date.now() - 3  * 86400000).toISOString(), polarity: 'positive' },
-  { id: -3, score: 1,  reason: 'Helping a classmate',         lessonName: 'Science',  teacherName: 'Dr R Evans',    timestamp: new Date(Date.now() - 5  * 86400000).toISOString(), polarity: 'positive' },
-  { id: -4, score: -1, reason: 'Late to lesson',              lessonName: 'History',  teacherName: 'Miss L Davies', timestamp: new Date(Date.now() - 8  * 86400000).toISOString(), polarity: 'negative' },
-  { id: -5, score: 2,  reason: 'Outstanding project work',    lessonName: 'Art',      teacherName: 'Mrs K Wilson',  timestamp: new Date(Date.now() - 12 * 86400000).toISOString(), polarity: 'positive' },
+  { id: -1, type: 'behaviour', score: 2,  reason: 'Excellent class contribution', lessonName: 'English',  teacherName: 'Mr J Thompson', roomName: null, note: null, timestamp: new Date(Date.now() - 1  * 86400000).toISOString(), polarity: 'positive' },
+  { id: -2, type: 'behaviour', score: 1,  reason: 'Good homework submission',     lessonName: 'Maths',    teacherName: 'Mrs A Patel',   roomName: null, note: null, timestamp: new Date(Date.now() - 3  * 86400000).toISOString(), polarity: 'positive' },
+  { id: -3, type: 'behaviour', score: 1,  reason: 'Helping a classmate',         lessonName: 'Science',  teacherName: 'Dr R Evans',    roomName: null, note: null, timestamp: new Date(Date.now() - 5  * 86400000).toISOString(), polarity: 'positive' },
+  { id: -4, type: 'behaviour', score: -1, reason: 'Late to lesson',              lessonName: 'History',  teacherName: 'Miss L Davies', roomName: null, note: null, timestamp: new Date(Date.now() - 8  * 86400000).toISOString(), polarity: 'negative' },
+  { id: -5, type: 'behaviour', score: 2,  reason: 'Outstanding project work',    lessonName: 'Art',      teacherName: 'Mrs K Wilson',  roomName: null, note: null, timestamp: new Date(Date.now() - 12 * 86400000).toISOString(), polarity: 'positive' },
 ];
 
 function useBehaviourData(pupilId: number | undefined) {
