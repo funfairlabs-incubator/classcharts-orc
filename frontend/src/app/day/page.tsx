@@ -328,7 +328,7 @@ export default function DayPage() {
       </div>
 
       {/* AM/PM session bands */}
-      {pupils.length > 1 ? (
+      {(pupils.length > 1 || hasDemo) ? (
         <>
           {/* Two-column AM/PM */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
