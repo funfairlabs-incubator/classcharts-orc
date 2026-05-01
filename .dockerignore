@@ -1,0 +1,8 @@
+# Don't send these to Cloud Build context
+frontend/
+.git/
+.github/
+*.md
+node_modules/
+frontend/node_modules/
+.next/

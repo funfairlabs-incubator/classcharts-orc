@@ -38,7 +38,6 @@ jobs:
         run: |
           mkdir -p frontend/vendor/shared
           cp -r shared/dist frontend/vendor/shared/
-          cp -r shared/src frontend/vendor/shared/
           cp shared/package.json frontend/vendor/shared/
           cd frontend/vendor/shared && npm install --production --ignore-scripts
 
