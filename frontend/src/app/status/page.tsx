@@ -48,6 +48,18 @@ export default function StatusPage() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [triggering, setTriggering] = useState(false);
+
+  async function triggerPoll() {
+    setTriggering(true);
+    try {
+      await fetch('/api/trigger-poll', { method: 'POST' });
+      // Wait 15s for poll to complete then refresh
+      setTimeout(load, 15000);
+    } catch { /* ignore */ }
+    setTimeout(() => setTriggering(false), 15000);
+  }
+
   async function load() {
     setLoading(true);
     try {
@@ -103,9 +115,14 @@ export default function StatusPage() {
                 Last checked {ago(status!.fetchedAt)}
               </p>
             </div>
-            <button onClick={load} style={{ marginLeft: 'auto', fontSize: 11, padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 4, background: 'var(--surface)', cursor: 'pointer', color: 'var(--text-2)' }}>
-              Refresh
-            </button>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+              <button onClick={load} style={{ fontSize: 11, padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 4, background: 'var(--surface)', cursor: 'pointer', color: 'var(--text-2)' }}>
+                Refresh
+              </button>
+              <button onClick={triggerPoll} disabled={triggering} style={{ fontSize: 11, padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 4, background: triggering ? 'var(--surface-2)' : 'var(--surface)', cursor: triggering ? 'default' : 'pointer', color: 'var(--text-2)' }}>
+                {triggering ? 'Polling…' : 'Trigger poll'}
+              </button>
+            </div>
           </div>
 
           {/* Poller heartbeat */}

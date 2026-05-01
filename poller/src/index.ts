@@ -29,5 +29,16 @@ app.post('/', async (req, res) => {
 
 app.get('/health', (_req, res) => res.json({ ok: true, version: '2' }));
 
+// Manual trigger for testing — requires same auth as Pub/Sub
+app.post('/trigger', async (_req, res) => {
+  res.status(200).json({ triggered: true, at: new Date().toISOString() });
+  try {
+    console.log('Manual trigger received');
+    await pollClassCharts();
+  } catch (err) {
+    console.error('Manual trigger failed:', err);
+  }
+});
+
 const PORT = process.env.PORT ?? 8080;
 app.listen(PORT, () => console.log(`Poller listening on :${PORT}`));
