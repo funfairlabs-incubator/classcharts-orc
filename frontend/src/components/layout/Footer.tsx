@@ -1,6 +1,8 @@
+import buildInfo from '../../build-info.json';
+
 export function Footer() {
-  const commitSha  = process.env.NEXT_PUBLIC_COMMIT_SHA  ?? 'local';
-  const deployedAt = process.env.NEXT_PUBLIC_DEPLOYED_AT ?? 'local build';
+  const commitSha  = buildInfo.commitSha  ?? process.env.NEXT_PUBLIC_COMMIT_SHA  ?? 'local';
+  const deployedAt = buildInfo.deployedAt ?? process.env.NEXT_PUBLIC_DEPLOYED_AT ?? 'local build';
 
   return (
     <footer style={styles.footer}>
