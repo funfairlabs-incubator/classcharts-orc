@@ -85,11 +85,11 @@ export function TimetableTimeline({ lessons, href, accent, compact = false }: Pr
     }
   }
 
-  // Arrow position as % of day
-  const arrowPct = beforeSchool ? 0 : afterSchool ? 100
+  // Progress position as % of day
+  const progressPct = beforeSchool ? 0 : afterSchool ? 100
     : Math.min(100, Math.max(0, ((nowMins - firstStart) / daySpan) * 100));
 
-  const showArrow = !beforeSchool && !afterSchool;
+  const showProgress = !beforeSchool && !afterSchool;
 
   return (
     <div>
@@ -153,11 +153,31 @@ export function TimetableTimeline({ lessons, href, accent, compact = false }: Pr
                 }} />
               );
             })}
-            {/* Now arrow */}
-            {showArrow && (
-              <div style={{ ...styles.nowArrow, left: `${arrowPct}%` }}>
-                <div style={{ ...styles.arrowHead, borderBottomColor: accent.color }} />
-                <div style={{ ...styles.arrowLine, background: accent.color }} />
+            {/* Now marker — vertical line + dot */}
+            {showProgress && (
+              <div style={{
+                position: 'absolute',
+                left: `${progressPct}%`,
+                top: -3,
+                bottom: -3,
+                width: 2,
+                background: accent.color,
+                borderRadius: 2,
+                transform: 'translateX(-50%)',
+                zIndex: 10,
+                pointerEvents: 'none',
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: accent.color,
+                  boxShadow: `0 0 0 3px var(--bg), 0 0 0 4px ${accent.color}`,
+                }} />
               </div>
             )}
           </div>
@@ -234,18 +254,7 @@ const styles: Record<string, React.CSSProperties> = {
   timeLabels: { display: 'flex', justifyContent: 'space-between' },
   timeLabel: { fontSize: 11, fontWeight: 500, color: 'var(--text-2)' },
 
-  nowArrow: {
-    position: 'absolute', top: -7, transform: 'translateX(-50%)',
-    display: 'flex', flexDirection: 'column', alignItems: 'center',
-    pointerEvents: 'none', zIndex: 10,
-  },
-  arrowHead: {
-    width: 0, height: 0,
-    borderLeft: '6px solid transparent',
-    borderRight: '6px solid transparent',
-    borderBottom: '8px solid',
-  },
-  arrowLine: { width: 2, height: 28, marginTop: -1 },
+
 
   lessonList: { display: 'flex', flexDirection: 'column', gap: 1, marginBottom: 10 },
   lessonRow: {

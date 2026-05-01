@@ -4,6 +4,7 @@ import { usePupil, useClassChartsData } from '@/lib/usePupil';
 import type { CCStudent, CCLesson, CCActivityPoint, CCHomework, CCAttendanceSummary, CCAnnouncement, UpcomingEvent, ArchivedAnnouncement } from '@classcharts/shared';
 import Link from 'next/link';
 import { TimetableTimeline } from '@/components/TimetableTimeline';
+import { DemoStudentCard } from '@/components/DemoStudentCard';
 
 // One accent colour per student slot — warm, distinct, accessible
 const STUDENT_ACCENTS = [
@@ -16,6 +17,13 @@ const STUDENT_ACCENTS = [
 export default function OverviewPage() {
   const { pupils, loading } = usePupil();
   const [savedPalettes, setSavedPalettes] = useState<Record<number, typeof STUDENT_ACCENTS[0]>>({});
+  const [demoMode, setDemoMode] = useState(false);
+  useEffect(() => {
+    try { if (localStorage.getItem('demoMode') === 'true') setDemoMode(true); } catch { /* ignore */ }
+    const handler = (e: Event) => setDemoMode((e as CustomEvent).detail);
+    window.addEventListener('demoModeChange', handler);
+    return () => window.removeEventListener('demoModeChange', handler);
+  }, []);
   useEffect(() => {
     try {
       const saved = localStorage.getItem('pupilPalettes');
@@ -38,6 +46,7 @@ export default function OverviewPage() {
         {pupils.map((pupil, i) => (
           <StudentCard key={pupil.id} pupil={pupil} accent={savedPalettes[pupil.id] ?? STUDENT_ACCENTS[i % STUDENT_ACCENTS.length]} />
         ))}
+        {demoMode && <DemoStudentCard accent={STUDENT_ACCENTS[pupils.length % STUDENT_ACCENTS.length]} />}
       </div>
     </div>
   );
