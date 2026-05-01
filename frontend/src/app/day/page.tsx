@@ -239,15 +239,15 @@ export default function DayPage() {
   // Use pupil A's timetable as the time spine (same bell times for same school)
   // If only one pupil, just show single column
   const singlePupil = !pupilB && !hasDemo;
-  const demoLessons = hasDemo ? [
-    { subjectName: 'English',  teacherName: 'Mr J Thompson', roomName: 'B12',        periodName: '1', periodNumber: '1', startTime: '08:50', endTime: '09:50', isBreak: false, isAlternative: false, pupilNote: '', lessonName: '' },
-    { subjectName: '',         teacherName: '',               roomName: '',           periodName: 'Break', periodNumber: '', startTime: '09:50', endTime: '10:10', isBreak: true,  isAlternative: false, pupilNote: '', lessonName: 'Break' },
-    { subjectName: 'Maths',    teacherName: 'Mrs A Patel',   roomName: 'C04',        periodName: '2', periodNumber: '2', startTime: '10:10', endTime: '11:10', isBreak: false, isAlternative: false, pupilNote: '', lessonName: '' },
-    { subjectName: 'Science',  teacherName: 'Dr R Evans',    roomName: 'Lab 2',      periodName: '3', periodNumber: '3', startTime: '11:10', endTime: '12:10', isBreak: false, isAlternative: false, pupilNote: '', lessonName: '' },
-    { subjectName: '',         teacherName: '',               roomName: '',           periodName: 'Lunch', periodNumber: '', startTime: '12:10', endTime: '13:00', isBreak: true,  isAlternative: false, pupilNote: '', lessonName: 'Lunch' },
-    { subjectName: 'History',  teacherName: 'Miss L Davies', roomName: 'A07',        periodName: '4', periodNumber: '4', startTime: '13:00', endTime: '14:00', isBreak: false, isAlternative: false, pupilNote: '', lessonName: '' },
-    { subjectName: 'PE',       teacherName: 'Mr S Wilson',   roomName: 'Sports Hall', periodName: '5', periodNumber: '5', startTime: '14:00', endTime: '15:00', isBreak: false, isAlternative: false, pupilNote: '', lessonName: '' },
-  ].map(l => ({ ...l, date: selectedDate })) as CCLesson[] : [];
+  // Demo lessons use same bell times as dataA (Mollie's school) so mergeByTime aligns them
+  const demoLessons = hasDemo && dataA.lessons.length > 0 ? dataA.lessons.map((l, i) => {
+    const subjects = ['English', 'Maths', 'Science', 'History', 'PE', 'Art', 'Spanish'];
+    const teachers = ['Mr J Thompson', 'Mrs A Patel', 'Dr R Evans', 'Miss L Davies', 'Mr S Wilson', 'Mrs K Jones', 'Mrs N Lopez'];
+    const rooms    = ['B12', 'C04', 'Lab 2', 'A07', 'Sports Hall', 'D03', 'B08'];
+    if (l.isBreak) return { ...l };
+    const idx = i % subjects.length;
+    return { ...l, subjectName: subjects[idx], teacherName: teachers[idx], roomName: rooms[idx], lessonName: '' };
+  }) : [];
   const bLessons = pupilB ? dataB.lessons : (hasDemo ? demoLessons : []);
   const rows = singlePupil ? [] : mergeByTime(dataA.lessons, bLessons);
 
