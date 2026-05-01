@@ -49,14 +49,19 @@ export default function StatusPage() {
   const [loading, setLoading] = useState(true);
 
   const [triggering, setTriggering] = useState(false);
+  const [triggerResult, setTriggerResult] = useState<string | null>(null);
 
   async function triggerPoll() {
     setTriggering(true);
+    setTriggerResult(null);
     try {
-      await fetch('/api/trigger-poll', { method: 'POST' });
-      // Wait 15s for poll to complete then refresh
+      const res = await fetch('/api/trigger-poll', { method: 'POST' });
+      const data = await res.json();
+      setTriggerResult(JSON.stringify(data));
       setTimeout(load, 15000);
-    } catch { /* ignore */ }
+    } catch (err) {
+      setTriggerResult(`Error: ${String(err)}`);
+    }
     setTimeout(() => setTriggering(false), 15000);
   }
 
@@ -90,7 +95,7 @@ export default function StatusPage() {
           <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 16 }}>
             The poller has not written a status record yet.
           </p>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 8 }}>
             <button onClick={load} style={{ fontSize: 12, padding: '6px 14px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--surface)', cursor: 'pointer', color: 'var(--text-2)' }}>
               Refresh
             </button>
@@ -98,6 +103,11 @@ export default function StatusPage() {
               {triggering ? 'Polling…' : 'Trigger poll now'}
             </button>
           </div>
+          {triggerResult && (
+            <p style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', wordBreak: 'break-all', marginTop: 8 }}>
+              {triggerResult}
+            </p>
+          )}
         </div>
       )}
 

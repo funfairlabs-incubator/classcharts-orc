@@ -20,7 +20,7 @@ export async function POST() {
 
   try {
     const token = await getIdentityToken(POLLER_URL);
-    const res = await fetch(`${POLLER_URL}/`, {
+    const res = await fetch(`${POLLER_URL}/trigger`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
