@@ -150,7 +150,7 @@ const styles: Record<string, React.CSSProperties> = {
   topBar: {
     position: 'sticky', top: 0, zIndex: 100,
     background: 'var(--surface)', borderBottom: '1px solid var(--border)',
-    padding: '0 16px', height: 52,
+    padding: '0 16px', height: 44,
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   },
 
