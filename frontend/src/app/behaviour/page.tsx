@@ -63,7 +63,23 @@ export default function BehaviourPage() {
 
   const pupilA = pupils[0];
   const pupilB = pupils[1];
-  const accentA = { color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' };
+
+  const [savedPalettes, setSavedPalettes] = useState<Record<number, { color: string; bg: string; border: string }>>({});
+  useEffect(() => {
+    try {
+      const p = localStorage.getItem('pupilPalettes');
+      if (p) setSavedPalettes(JSON.parse(p));
+    } catch { /* ignore */ }
+  }, []);
+
+  const DEFAULT_ACCENTS = [
+    { color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
+    { color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' },
+  ];
+
+  const accentA = savedPalettes[pupilA?.id ?? 0] ?? DEFAULT_ACCENTS[0];
+
+  const accentB = savedPalettes[pupilB?.id ?? 0] ?? DEFAULT_ACCENTS[1];
 
   const { data: dataA } = useBehaviourData(pupilA?.id);
   const { data: dataB } = useBehaviourData(pupilB?.id);
@@ -75,7 +91,7 @@ export default function BehaviourPage() {
 
   const allActivity = [
     ...pointsA.map(p => ({ point: p, pupil: pupilA!, accent: accentA, isDemo: false })),
-    ...pointsB.map(p => ({ point: p, pupil: pupilB!, accent: demoPalette, isDemo: false })),
+    ...pointsB.map(p => ({ point: p, pupil: pupilB!, accent: accentB, isDemo: false })),
     ...demoPoints.map(p => ({ point: p, pupil: demoStudent as any, accent: demoPalette, isDemo: true })),
   ].sort((a, b) => new Date(b.point.timestamp).getTime() - new Date(a.point.timestamp).getTime());
 
@@ -101,7 +117,7 @@ export default function BehaviourPage() {
             <p style={{ ...styles.studentLabel, color: demoPalette.color }}>
               {pupilB?.firstName ?? 'Demo Student'}{!pupilB && <span style={{ fontSize: 9, marginLeft: 6, opacity: 0.7, fontFamily: 'var(--font-mono)' }}>DEMO</span>}
             </p>
-            <SummaryCards points={pupilB ? pointsB : demoPoints} accent={demoPalette} />
+            <SummaryCards points={pupilB ? pointsB : demoPoints} accent={pupilB ? accentB : demoPalette} />
           </div>
         )}
       </div>
