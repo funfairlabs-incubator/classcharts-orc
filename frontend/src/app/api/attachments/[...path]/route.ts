@@ -10,6 +10,12 @@ export async function GET(req: NextRequest, { params }: { params: { path: string
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const gcsPath = params.path.join('/');
+
+  // Security: prevent path traversal — all attachments must be under attachments/
+  if (!gcsPath.startsWith('attachments/') || gcsPath.includes('..')) {
+    return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+  }
+
   try {
     const file = storage.bucket(process.env.GCS_BUCKET!).file(gcsPath);
     const [exists] = await file.exists();
