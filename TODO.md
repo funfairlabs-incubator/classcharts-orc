@@ -10,9 +10,10 @@
 
 ## 🟡 Security — Medium Priority
 
-- [x] **Middleware doesn't enforce auth** — `middleware.ts` only rewrites headers. Individual `if (!session)` checks are the only gate. If one API route is missing the check it is publicly accessible.
+- [ ] **Middleware doesn't enforce auth** — `middleware.ts` only rewrites headers. Individual `if (!session)` checks are the only gate. If one API route is missing the check it is publicly accessible.
   - Fix: add NextAuth middleware matcher blocking unauthenticated requests before they reach route handlers. Matcher must exclude `/api/auth/*`, `/auth/signin`, `/auth/error` and static assets or login flow breaks.
   - Impact: low risk — all routes already have session checks so behaviour is identical. Adds defence-in-depth only.
+  - **Attempted in PRs #45, #46, #47** — both `withAuth` and manual `getToken` approaches caused redirect loops. Root cause: our custom cookie config (`sameSite: none`, custom domain, App Engine header rewriting) interferes with `getToken` reading the JWT in middleware context. Reverted to original. Needs deeper investigation — likely requires aligning cookie config with what `getToken` expects in middleware, or switching to database sessions.
 
 - [ ] **ClassCharts credentials in `app.yaml` env vars** — plaintext in App Engine environment. Visible in GCP Console to anyone with project access.
   - Fix: use App Engine `secretEnv` to reference Secret Manager directly rather than injecting at deploy time.
