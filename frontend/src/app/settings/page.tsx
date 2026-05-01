@@ -61,6 +61,7 @@ export default function SettingsPage() {
   const [palettes, setPalettes] = useState<Record<number, typeof PALETTE_PRESETS[0]>>({});
   const [themeColour, setThemeColour] = useState('#f97316');
   const [demoMode, setDemoMode] = useState(false);
+  const [demoPalette, setDemoPalette] = useState(PALETTE_PRESETS[2]); // Green default
 
   useEffect(() => {
     try {
@@ -74,6 +75,10 @@ export default function SettingsPage() {
     try {
       const dm = localStorage.getItem('demoMode');
       if (dm === 'true') setDemoMode(true);
+    } catch { /* ignore */ }
+    try {
+      const dp = localStorage.getItem('demoPalette');
+      if (dp) setDemoPalette(JSON.parse(dp));
     } catch { /* ignore */ }
     fetch('/api/settings/prefs')
       .then(r => r.json())
@@ -112,6 +117,12 @@ export default function SettingsPage() {
     setDemoMode(next);
     try { localStorage.setItem('demoMode', String(next)); } catch { /* ignore */ }
     window.dispatchEvent(new CustomEvent('demoModeChange', { detail: next }));
+  }
+
+  function setDemoColour(preset: typeof PALETTE_PRESETS[0]) {
+    setDemoPalette(preset);
+    try { localStorage.setItem('demoPalette', JSON.stringify(preset)); } catch { /* ignore */ }
+    window.dispatchEvent(new CustomEvent('demoPaletteChange', { detail: preset }));
   }
 
   function setTheme(colour: string) {
@@ -237,6 +248,20 @@ export default function SettingsPage() {
                 }} />
               </button>
             </div>
+          {demoMode && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+              <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Demo student colour</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {PALETTE_PRESETS.map(preset => (
+                  <button key={preset.color} onClick={() => setDemoColour(preset)} title={preset.label} style={{
+                    width: 28, height: 28, borderRadius: '50%', background: preset.color,
+                    border: 'none', cursor: 'pointer',
+                    boxShadow: demoPalette.color === preset.color ? `0 0 0 2px var(--bg), 0 0 0 4px ${preset.color}` : 'none',
+                  }} />
+                ))}
+              </div>
+            </div>
+          )}
           </div>
 
           {/* Theme colour */}

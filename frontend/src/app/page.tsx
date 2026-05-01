@@ -18,11 +18,21 @@ export default function OverviewPage() {
   const { pupils, loading } = usePupil();
   const [savedPalettes, setSavedPalettes] = useState<Record<number, typeof STUDENT_ACCENTS[0]>>({});
   const [demoMode, setDemoMode] = useState(false);
+  const [demoPalette, setDemoPalette] = useState(STUDENT_ACCENTS[2]);
   useEffect(() => {
-    try { if (localStorage.getItem('demoMode') === 'true') setDemoMode(true); } catch { /* ignore */ }
+    try {
+      if (localStorage.getItem('demoMode') === 'true') setDemoMode(true);
+      const dp = localStorage.getItem('demoPalette');
+      if (dp) setDemoPalette(JSON.parse(dp));
+    } catch { /* ignore */ }
     const handler = (e: Event) => setDemoMode((e as CustomEvent).detail);
+    const paletteHandler = (e: Event) => setDemoPalette((e as CustomEvent).detail);
     window.addEventListener('demoModeChange', handler);
-    return () => window.removeEventListener('demoModeChange', handler);
+    window.addEventListener('demoPaletteChange', paletteHandler);
+    return () => {
+      window.removeEventListener('demoModeChange', handler);
+      window.removeEventListener('demoPaletteChange', paletteHandler);
+    };
   }, []);
   useEffect(() => {
     try {
@@ -46,7 +56,7 @@ export default function OverviewPage() {
         {pupils.map((pupil, i) => (
           <StudentCard key={pupil.id} pupil={pupil} accent={savedPalettes[pupil.id] ?? STUDENT_ACCENTS[i % STUDENT_ACCENTS.length]} />
         ))}
-        {demoMode && <DemoStudentCard accent={STUDENT_ACCENTS[pupils.length % STUDENT_ACCENTS.length]} />}
+        {demoMode && <DemoStudentCard accent={demoPalette} />}
       </div>
     </div>
   );
