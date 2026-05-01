@@ -66,22 +66,22 @@ export function DemoStudentCard({ accent }: Props) {
         />
       </div>
 
-      {/* Stats row */}
-      <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0 20px' }} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', borderTop: '1px solid var(--border)', margin: '0' }}>
+      {/* Stats row — matches real StatCell exactly */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', borderTop: '1px solid var(--border)' }}>
         {[
-          { label: 'BEHAVIOUR', value: DEMO_STATS.behaviour, sub: 'this week', color: accent.color },
-          { label: 'HOMEWORK', value: DEMO_STATS.homework, sub: 'to do', color: accent.color },
-          { label: 'ATTENDANCE', value: `${DEMO_STATS.attendance}%`, sub: '30 days', color: 'var(--positive)' },
-          { label: 'LATEST NEWS', value: 'Sports Day', sub: 'Mrs K Jones', color: accent.color, small: true },
+          { label: 'Behaviour', value: String(DEMO_STATS.behaviour), sub: 'this week', color: accent.color },
+          { label: 'Homework', value: String(DEMO_STATS.homework), sub: 'to do', color: accent.color },
+          { label: 'Attendance', value: `${DEMO_STATS.attendance}%`, sub: '30 days', color: 'var(--positive)' },
+          { label: 'Latest News', value: 'Sports Day', sub: 'Mrs K Jones', color: accent.color, small: true },
         ].map((stat, i) => (
           <div key={i} style={{
-            padding: '10px 6px', textAlign: 'center',
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            padding: '14px 8px 16px', gap: 2,
             borderRight: i < 3 ? '1px solid var(--border)' : 'none',
           }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', color: stat.color, marginBottom: 4, textTransform: 'uppercase' }}>{stat.label}</div>
-            <div style={{ fontSize: stat.small ? 13 : 22, fontWeight: 700, color: stat.color, lineHeight: 1.1 }}>{stat.value}</div>
-            {stat.sub && <div style={{ fontSize: 10, color: 'var(--text-2)', marginTop: 2 }}>{stat.sub}</div>}
+            <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600, marginBottom: 4, color: accent.color }}>{stat.label}</span>
+            <span style={{ fontSize: stat.small ? 14 : 22, fontFamily: 'var(--font-display)', fontWeight: 500, color: stat.color, lineHeight: 1.1 }}>{stat.value}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 500 }}>{stat.sub}</span>
           </div>
         ))}
       </div>

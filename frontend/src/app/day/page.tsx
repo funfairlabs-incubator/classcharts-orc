@@ -28,16 +28,47 @@ function statusIcon(status: string): { icon: string; color: string; bg: string }
 
 function getSessionGroups(
   lessons: CCLesson[],
-  sessions: Record<string, { status: string; lateMinutes: number }>,
+  sessions: Record<string, { status: string; lateMinutes: number; lessonName?: string }>,
 ) {
   const amSession = sessions['AM'] ?? null;
   const pmSession = sessions['PM'] ?? null;
   const periodMap = new Map<number, { status: string; lateMinutes: number; key: string }>();
+
+  // Session keys are "Period 1", "Period 2", "Period REG" etc
+  // Match to lessons by period number or lesson name
   lessons.forEach((lesson, i) => {
-    if (sessions['Reg'] && i === 0) { periodMap.set(i, { ...sessions['Reg'], key: 'Reg' }); return; }
-    const periodNum = lesson.periodName?.replace(/\D/g, '');
-    if (periodNum && sessions[periodNum]) periodMap.set(i, { ...sessions[periodNum], key: `P${periodNum}` });
+    if (lesson.isBreak) return;
+
+    // Try "Period REG" for registration
+    if (sessions['Period REG'] && (lesson.periodName?.toLowerCase().includes('reg') || lesson.lessonName?.toLowerCase().includes('tu'))) {
+      const s = sessions['Period REG'];
+      if (s.status !== 'ignore') periodMap.set(i, { ...s, key: 'REG' });
+      return;
+    }
+
+    // Try "Period N" where N matches lesson periodNumber or periodName
+    const periodNum = lesson.periodNumber || lesson.periodName?.replace(/\D/g, '');
+    if (periodNum) {
+      const key = `Period ${periodNum}`;
+      if (sessions[key] && sessions[key].status !== 'ignore') {
+        periodMap.set(i, { ...sessions[key], key: `P${periodNum}` });
+        return;
+      }
+    }
+
+    // Fallback: match by lesson name in session lessonName field
+    const lessonCode = lesson.lessonName || lesson.subjectName;
+    if (lessonCode) {
+      const match = Object.entries(sessions).find(([k, s]) =>
+        k.startsWith('Period') && s.lessonName && s.lessonName === lessonCode && s.status !== 'ignore'
+      );
+      if (match) {
+        const num = match[0].replace('Period ', '');
+        periodMap.set(i, { ...match[1], key: `P${num}` });
+      }
+    }
   });
+
   return { amSession, pmSession, periodMap };
 }
 
