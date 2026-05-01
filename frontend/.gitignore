@@ -1,0 +1,2 @@
+# Never commit — vendor/shared is dynamic, lockfile causes Cloud Build npm ci failures
+package-lock.json
