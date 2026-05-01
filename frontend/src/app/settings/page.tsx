@@ -60,6 +60,7 @@ export default function SettingsPage() {
   const { pupils } = usePupil();
   const [palettes, setPalettes] = useState<Record<number, typeof PALETTE_PRESETS[0]>>({});
   const [themeColour, setThemeColour] = useState('#f97316');
+  const [demoMode, setDemoMode] = useState(false);
 
   useEffect(() => {
     try {
@@ -69,6 +70,10 @@ export default function SettingsPage() {
     try {
       const tc = localStorage.getItem('themeColour');
       if (tc) { setThemeColour(tc); applyThemeColour(tc); }
+    } catch { /* ignore */ }
+    try {
+      const dm = localStorage.getItem('demoMode');
+      if (dm === 'true') setDemoMode(true);
     } catch { /* ignore */ }
     fetch('/api/settings/prefs')
       .then(r => r.json())
@@ -100,6 +105,13 @@ export default function SettingsPage() {
     meta.content = colour;
     // Also update the nav bar background via CSS variable
     document.documentElement.style.setProperty('--theme-colour', colour);
+  }
+
+  function toggleDemoMode() {
+    const next = !demoMode;
+    setDemoMode(next);
+    try { localStorage.setItem('demoMode', String(next)); } catch { /* ignore */ }
+    window.dispatchEvent(new CustomEvent('demoModeChange', { detail: next }));
   }
 
   function setTheme(colour: string) {
@@ -205,6 +217,27 @@ export default function SettingsPage() {
         <div className="card" style={styles.section}>
           <h2 style={styles.sectionTitle}>Card Colours</h2>
           <p style={styles.sectionDesc}>Choose an accent colour for each child's card on the dashboard.</p>
+
+          {/* Demo mode */}
+          <div style={{ marginBottom: 24, padding: '12px 16px', background: demoMode ? 'var(--surface-2)' : 'transparent', borderRadius: 8, border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Demo: second student</p>
+                <p style={{ fontSize: 12, color: 'var(--text-2)' }}>Shows a preview card with example data — useful for testing layouts before a new child joins.</p>
+              </div>
+              <button onClick={toggleDemoMode} style={{
+                width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
+                background: demoMode ? 'var(--accent, #6366f1)' : 'var(--border)',
+                position: 'relative', flexShrink: 0, marginLeft: 16, transition: 'background 0.2s',
+              }}>
+                <span style={{
+                  position: 'absolute', top: 3, left: demoMode ? 22 : 2,
+                  width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                  transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                }} />
+              </button>
+            </div>
+          </div>
 
           {/* Theme colour */}
           <div style={{ marginBottom: 24 }}>
