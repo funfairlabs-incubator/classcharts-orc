@@ -4,49 +4,38 @@ import { usePupil, useClassChartsData } from '@/lib/usePupil';
 import type { CCLesson, CCAttendanceSummary } from '@classcharts/shared';
 
 // ── Attendance mark → lesson slot mapping ─────────────────────────────────
-// ClassCharts returns sessions keyed as: AM, PM, 1, 2, 3... or Reg
-// We map these onto the timetable by time + period number
-function mapAttendanceToLessons(
+// AM = whole morning session (periods 1 & 2), shown as a header band
+// PM = whole afternoon session (periods 3-5), shown as a header band
+// Individual period marks (1, 2, 3...) shown on specific lessons if present
+// These are independent — AM/PM are the register mark, periods are granular
+function getSessionGroups(
   lessons: CCLesson[],
   sessions: Record<string, { status: string; lateMinutes: number }>,
-  date: string,
-): Map<number, { status: string; lateMinutes: number; key: string }> {
-  const result = new Map<number, { status: string; lateMinutes: number; key: string }>();
-  if (!sessions) return result;
+): {
+  amSession: { status: string; lateMinutes: number } | null;
+  pmSession: { status: string; lateMinutes: number } | null;
+  periodMap: Map<number, { status: string; lateMinutes: number; key: string }>;
+} {
+  const lunchCutoff = 12 * 60;
+  const amSession = sessions['AM'] ?? null;
+  const pmSession = sessions['PM'] ?? null;
+  const periodMap = new Map<number, { status: string; lateMinutes: number; key: string }>();
 
-  const lunchCutoff = 12 * 60; // 12:00
-
+  // Map individual period marks to lesson indices
   lessons.forEach((lesson, i) => {
-    const startMins = timeMins(lesson.startTime);
-    const isAM = startMins < lunchCutoff;
-
-    // Try period number match first (most accurate)
-    const periodNum = lesson.periodName?.replace(/\D/g, '');
-    if (periodNum && sessions[periodNum]) {
-      result.set(i, { ...sessions[periodNum], key: periodNum });
+    // Reg → first lesson
+    if (sessions['Reg'] && i === 0) {
+      periodMap.set(i, { ...sessions['Reg'], key: 'Reg' });
       return;
     }
-
-    // Try AM/PM session match
-    const sessionKey = isAM ? 'AM' : 'PM';
-    if (sessions[sessionKey] && !result.has(i)) {
-      // Only apply AM/PM to the first non-break lesson in each half
-      const halfLessons = lessons.filter((l, idx) => {
-        const sm = timeMins(l.startTime);
-        return !l.isBreak && (isAM ? sm < lunchCutoff : sm >= lunchCutoff);
-      });
-      if (halfLessons[0] === lesson) {
-        result.set(i, { ...sessions[sessionKey], key: sessionKey });
-      }
-    }
-
-    // Reg → first lesson of day
-    if (sessions['Reg'] && i === 0) {
-      result.set(i, { ...sessions['Reg'], key: 'Reg' });
+    // Period number match
+    const periodNum = lesson.periodName?.replace(/\D/g, '');
+    if (periodNum && sessions[periodNum]) {
+      periodMap.set(i, { ...sessions[periodNum], key: `P${periodNum}` });
     }
   });
 
-  return result;
+  return { amSession, pmSession, periodMap };
 }
 
 function timeMins(t: string): number {
@@ -128,7 +117,9 @@ export default function DayPage() {
   const sessions = dayAttendance?.sessions ?? {};
 
   // Map attendance to lessons
-  const attendanceMap = lessons ? mapAttendanceToLessons(lessons, sessions, selectedDate) : new Map();
+  const { amSession, pmSession, periodMap: attendanceMap } = lessons
+    ? getSessionGroups(lessons, sessions)
+    : { amSession: null, pmSession: null, periodMap: new Map() };
 
   const weekDays = getWeekDays(selectedDate);
   const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
@@ -195,7 +186,37 @@ export default function DayPage() {
       {lessonsLoading && <div style={{ height: 300, background: 'var(--surface-2)', borderRadius: 8, marginTop: 16 }} />}
 
       {!lessonsLoading && (
-        <div className="card" style={{ overflow: 'hidden', marginTop: 12 }}>
+        {/* AM / PM session bands */}
+        {(amSession || pmSession) && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            {amSession && (() => { const s = statusIcon(amSession.status); return (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 6, background: s.bg, border: `1px solid ${s.color}22` }}>
+                <span style={{ ...styles.attBadge, color: s.color, background: 'transparent', fontSize: 14 }}>{s.icon}</span>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: s.color }}>AM Session</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-3)' }}>
+                    {amSession.status.charAt(0).toUpperCase() + amSession.status.slice(1)}
+                    {amSession.lateMinutes > 0 ? ` · ${amSession.lateMinutes}m late` : ''}
+                  </div>
+                </div>
+              </div>
+            ); })()}
+            {pmSession && (() => { const s = statusIcon(pmSession.status); return (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 6, background: s.bg, border: `1px solid ${s.color}22` }}>
+                <span style={{ ...styles.attBadge, color: s.color, background: 'transparent', fontSize: 14 }}>{s.icon}</span>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: s.color }}>PM Session</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-3)' }}>
+                    {pmSession.status.charAt(0).toUpperCase() + pmSession.status.slice(1)}
+                    {pmSession.lateMinutes > 0 ? ` · ${pmSession.lateMinutes}m late` : ''}
+                  </div>
+                </div>
+              </div>
+            ); })()}
+          </div>
+        )}
+
+        <div className="card" style={{ overflow: 'hidden', marginTop: 0 }}>
           {!lessons?.length ? (
             <p style={{ padding: '24px 20px', fontSize: 13, color: 'var(--text-3)', textAlign: 'center' }}>
               No lessons on this day
