@@ -51,7 +51,14 @@ const DEPENDENCIES: Record<string, DependencyInfo> = {
     what: 'Trigger chain: Cloud Scheduler → Pub/Sub topic → push subscription → Cloud Run',
     why: 'Without it the poller never fires and all data goes stale. IAM binding and subscription push endpoint must be correct.',
     when: 'Every 5 minutes (scheduled poll) and 3pm weekdays (homework digest).',
-    with: 'Cloud Scheduler publishes to classcharts-poll topic. Pub/Sub push subscription delivers to Cloud Run via HTTP POST with OIDC token. IAM binding (roles/run.invoker) re-granted on every deploy. Subscription endpoint verified and auto-fixed on every deploy.',
+    with: 'Cloud Scheduler → classcharts-poll topic → classcharts-poller-sub subscription → Cloud Run HTTPS POST. IAM binding (roles/run.invoker) and push endpoint both re-verified on every deploy.',
+  },
+  cloudrun: {
+    label: 'Cloud Run (Poller)',
+    what: 'The poller container — receives Pub/Sub messages and executes polls',
+    why: 'Without a healthy container, no polls run regardless of Pub/Sub delivering correctly.',
+    when: 'Checked on status page load via /health endpoint.',
+    with: 'classcharts-poller Cloud Run service, europe-west2. Revision checked via authenticated /health GET.',
   },
   anthropic: {
     label: 'Anthropic API (Claude)',
@@ -146,10 +153,12 @@ export default function StatusPage() {
   const age = hb ? pollAge(hb.polledAt) : null;
   // If poller is stale (>15m), Pub/Sub trigger chain is implicitly broken
   const staleMins = hb ? Math.floor((Date.now() - new Date(hb.polledAt).getTime()) / 60000) : 0;
+  const cloudRunOk = status?.pollerHealth?.ok;
   const displayDeps = hb ? {
     ...hb.dependencies,
     // If stale, Pub/Sub trigger chain is implicitly broken
     pubsub: staleMins > 15 ? 'error' : (hb.dependencies.pubsub ?? 'ok'),
+    cloudrun: cloudRunOk === undefined ? 'unknown' : cloudRunOk ? 'ok' : 'error',
     // Ensure all known deps appear even if poller didn't report them
     ...Object.fromEntries(
       Object.keys(DEPENDENCIES)
@@ -234,6 +243,11 @@ export default function StatusPage() {
                   <p style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>
                     {new Date(hb.polledAt).toLocaleString('en-GB')}
                   </p>
+                  {status?.pollerHealth && (
+                    <p style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: status.pollerHealth.ok ? 'var(--positive)' : 'var(--negative)', marginTop: 4 }}>
+                      Container: {status.pollerHealth.ok ? `✓ healthy (${status.pollerHealth.latencyMs}ms)` : '✗ unreachable'}
+                    </p>
+                  )}
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: age!.color }}>{ago(hb.polledAt)}</span>

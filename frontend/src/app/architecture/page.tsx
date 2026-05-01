@@ -18,6 +18,7 @@ const NODE_TO_DEP: Partial<Record<NodeId, string>> = {
   gcal:          'gcal',
   gtasks:        'gtasks',
   secretmanager: 'secretmanager',
+  poller: 'cloudrun',
 };
 
 const STATUS_COLOR: Record<string, string> = {
