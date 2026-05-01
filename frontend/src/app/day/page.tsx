@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePupil, useClassChartsData } from '@/lib/usePupil';
 import type { CCLesson, CCAttendanceSummary } from '@classcharts/shared';
 
@@ -247,7 +247,7 @@ export default function DayPage() {
     { subjectName: '',         teacherName: '',               roomName: '',           periodName: 'Lunch', periodNumber: '', startTime: '12:10', endTime: '13:00', isBreak: true,  isAlternative: false, pupilNote: '', lessonName: 'Lunch' },
     { subjectName: 'History',  teacherName: 'Miss L Davies', roomName: 'A07',        periodName: '4', periodNumber: '4', startTime: '13:00', endTime: '14:00', isBreak: false, isAlternative: false, pupilNote: '', lessonName: null },
     { subjectName: 'PE',       teacherName: 'Mr S Wilson',   roomName: 'Sports Hall', periodName: '5', periodNumber: '5', startTime: '14:00', endTime: '15:00', isBreak: false, isAlternative: false, pupilNote: '', lessonName: null },
-  ] : [];
+  ].map(l => ({ ...l, date: selectedDate })) : [];
   const bLessons = pupilB ? dataB.lessons : (hasDemo ? demoLessons : []);
   const rows = singlePupil ? [] : mergeByTime(dataA.lessons, bLessons);
 
