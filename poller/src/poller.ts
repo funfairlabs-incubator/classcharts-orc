@@ -1,6 +1,6 @@
 import { loginAllParents, todayStr, daysAgoStr } from '@classcharts/shared';
 import type { CCStudent } from '@classcharts/shared';
-import { getState, saveState } from './state.js';
+import { getState, saveState, writeHeartbeat } from './state.js';
 import { sendPushoverToKeys } from './pushover.js';
 import { formatHomework, formatHomeworkOverdue, formatHomeworkStatusChange, formatActivity, formatAnnouncement, formatAttendance, formatDetention } from './formatter.js';
 import { analyseAnnouncement, summariseHomework, summariseActivity } from './claude.js';
@@ -14,6 +14,8 @@ export async function pollClassCharts(): Promise<void> {
   const from = daysAgoStr(30);
   const today = todayStr();
   const aheadTo = daysAgoStr(-30);
+
+  const pollErrors: string[] = [];
 
   const parents = await loginAllParents();
   console.log(`Logged in ${parents.length} parent(s), found ${parents.reduce((n, p) => n + p.pupils.length, 0)} unique pupil(s)`);
@@ -60,7 +62,7 @@ ${(err as any)?.stack ?? ''}`,
             state.lastActivityId = Math.max(...newPoints.map(a => a.id));
             changed = true;
           }
-        } catch (err) { console.error(`  Activity poll failed for ${pupil.name}:`, err); }
+        } catch (err) { const msg = `Activity poll failed for ${pupil.name}: ${String(err)}`; console.error(' ', msg); pollErrors.push(msg); }
       }
 
       // ── Homework ─────────────────────────────────────────────
@@ -199,7 +201,7 @@ ${(err as any)?.stack ?? ''}`,
           (state as any).homeworkStatuses = pruned;
           changed = true;
 
-        } catch (err) { console.error(`  Homework poll failed for ${pupil.name}:`, err); }
+        } catch (err) { const msg = `Homework poll failed for ${pupil.name}: ${String(err)}`; console.error(' ', msg); pollErrors.push(msg); }
       }
 
       // ── Announcements ────────────────────────────────────────
@@ -235,7 +237,7 @@ ${(err as any)?.stack ?? ''}`,
             state.lastAnnouncementId = Math.max(...[...seenSet]);
             changed = true;
           }
-        } catch (err) { console.error(`  Announcements poll failed for ${pupil.name}:`, err); }
+        } catch (err) { const msg = `Announcements poll failed for ${pupil.name}: ${String(err)}`; console.error(' ', msg); pollErrors.push(msg); }
       }
 
       // ── Attendance ───────────────────────────────────────────
@@ -264,7 +266,7 @@ ${(err as any)?.stack ?? ''}`,
             (state as any).knownAttendanceKeys = [...knownAttendanceKeys, ...newAlerts].slice(-200);
             changed = true;
           }
-        } catch (err) { console.error(`  Attendance poll failed for ${pupil.name}:`, err); }
+        } catch (err) { const msg = `Attendance poll failed for ${pupil.name}: ${String(err)}`; console.error(' ', msg); pollErrors.push(msg); }
       }
 
       // ── Detentions ───────────────────────────────────────────
@@ -279,10 +281,23 @@ ${(err as any)?.stack ?? ''}`,
             (state as any).knownDetentionIds = [...knownIds, ...newDetentions.map(d => d.id)].slice(-50);
             changed = true;
           }
-        } catch (err) { console.error(`  Detentions poll failed for ${pupil.name}:`, err); }
+        } catch (err) { const msg = `Detentions poll failed for ${pupil.name}: ${String(err)}`; console.error(' ', msg); pollErrors.push(msg); }
       }
 
       if (changed) { state.updatedAt = new Date().toISOString(); await saveState(state); }
     }
   }
+
+  // Write heartbeat to Firestore so status page can show last successful poll
+  await writeHeartbeat({
+    polledAt: new Date().toISOString(),
+    pupils: allStudents.map(s => s.name),
+    dependencies: {
+      classcharts: pollErrors.some(e => e.includes('login') || e.includes('TES') || e.includes('401') || e.includes('403')) ? 'error' : 'ok',
+      firestore: pollErrors.some(e => e.includes('Firestore') || e.includes('firestore')) ? 'error' : 'ok',
+      anthropic: pollErrors.some(e => e.includes('Anthropic') || e.includes('claude') || e.includes('summarise')) ? 'error' : 'ok',
+      pushover: pollErrors.some(e => e.includes('Pushover') || e.includes('pushover')) ? 'error' : 'ok',
+    },
+    errors: pollErrors.length > 0 ? pollErrors.slice(-10) : undefined,
+  });
 }

@@ -34,3 +34,24 @@ export async function saveGmailState(lastEmailId: string): Promise<void> {
     updatedAt: new Date().toISOString(),
   });
 }
+
+// ── Heartbeat ─────────────────────────────────────────────────────────────
+
+export interface PollerHeartbeat {
+  polledAt: string;
+  pupils: string[];
+  dependencies: Record<string, 'ok' | 'error'>;
+  errors?: string[];
+}
+
+export async function writeHeartbeat(beat: PollerHeartbeat): Promise<void> {
+  await db.collection('status').doc('poller').set({
+    ...beat,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export async function readHeartbeat(): Promise<PollerHeartbeat | null> {
+  const doc = await db.collection('status').doc('poller').get();
+  return doc.exists ? (doc.data() as PollerHeartbeat) : null;
+}
