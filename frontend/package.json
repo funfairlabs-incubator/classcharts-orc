@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "gcp-build": "cd vendor/shared && npm install --production && cd ../.. && next build",
+    "gcp-build": "cd vendor/shared && npm install --production && cd ../.. && node -e \"const fs=require('fs'); const sha=process.env.NEXT_PUBLIC_COMMIT_SHA||'unknown'; const at=process.env.NEXT_PUBLIC_DEPLOYED_AT||new Date().toUTCString(); const url=process.env.NEXT_PUBLIC_APP_URL||'https://classcharts.funfairlabs.com'; fs.writeFileSync('build-info.json',JSON.stringify({commitSha:sha,deployedAt:at,appUrl:url}))\" && next build",
     "build": "next build",
     "dev": "next dev",
     "start": "next start",
