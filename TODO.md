@@ -8,9 +8,14 @@
 
 ## 🟡 Security — Medium Priority
 
-- [ ] **Middleware doesn't enforce auth** — `middleware.ts` only rewrites headers. Individual `if (!session)` checks are the only gate. If one API route is missing the check it is publicly accessible. Fix: add NextAuth middleware matcher as a second layer of defence.
+- [x] **Middleware doesn't enforce auth** — `middleware.ts` only rewrites headers. Individual `if (!session)` checks are the only gate. If one API route is missing the check it is publicly accessible.
+  - Fix: add NextAuth middleware matcher blocking unauthenticated requests before they reach route handlers. Matcher must exclude `/api/auth/*`, `/auth/signin`, `/auth/error` and static assets or login flow breaks.
+  - Impact: low risk — all routes already have session checks so behaviour is identical. Adds defence-in-depth only.
 
-- [ ] **ClassCharts credentials in `app.yaml` env vars** — plaintext in App Engine environment. Low risk (App Engine is locked down) but Secret Manager at runtime (as the poller does) would be cleaner.
+- [ ] **ClassCharts credentials in `app.yaml` env vars** — plaintext in App Engine environment. Visible in GCP Console to anyone with project access.
+  - Fix: use App Engine `secretEnv` to reference Secret Manager directly rather than injecting at deploy time.
+  - Impact: medium risk to fix — App Engine `secretEnv` syntax differs from Cloud Run, requires careful testing. Current approach is reasonably safe since `app.yaml` is gitignored and generated at deploy time — plaintext never hits git.
+  - Decision: hold for now. Exposure is only within GCP Console (already privileged access). Not worth the migration risk at this stage. Revisit if project access is broadened.
 
 - [ ] **Session cookie scoped to `.funfairlabs.com`** — valid across all subdomains. If any other subdomain were compromised it could read the ClassCharts session cookie. Consider scoping to `classcharts.funfairlabs.com` only.
 
