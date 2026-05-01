@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "gcp-build": "cd vendor/shared && npm install --production && cd ../.. && next build",
+    "gcp-build": "cd vendor/shared && npm install --production && cd ../.. && printf 'NEXT_PUBLIC_COMMIT_SHA=%s\nNEXT_PUBLIC_DEPLOYED_AT=%s\n' \"${COMMIT_SHA:-unknown}\" \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" > .env.production.local && next build",
     "build": "next build",
     "dev": "next dev",
     "start": "next start",
