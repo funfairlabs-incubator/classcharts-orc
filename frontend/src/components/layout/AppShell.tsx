@@ -191,7 +191,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13, fontWeight: 500, color: 'var(--text-2)', cursor: 'pointer',
   },
 
-  main: { flex: 1, paddingBottom: 24 },
+  main: { flex: 1, paddingBottom: 48 }, // 48px = footer height clearance
 
   authWrap: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 24 },
   authCard: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '48px 40px', textAlign: 'center', maxWidth: 360, width: '100%', boxShadow: 'var(--shadow-md)' },
