@@ -1,8 +1,8 @@
-import buildInfo from '../../build-info.json';
+import { BUILD_INFO } from '@/lib/buildInfo';
 
 export function Footer() {
-  const commitSha  = (buildInfo as any).commitSha  ?? 'local';
-  const deployedAt = (buildInfo as any).deployedAt ?? 'local build';
+  const commitSha  = BUILD_INFO.commitSha;
+  const deployedAt = BUILD_INFO.deployedAt;
 
   return (
     <footer style={styles.footer}>
