@@ -1,10 +1,30 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 type NodeId =
   | 'classcharts' | 'scheduler' | 'pubsub' | 'poller' | 'firestore'
   | 'gcs' | 'secretmanager' | 'frontend' | 'browser' | 'pushover'
   | 'gcal' | 'gtasks' | 'claude' | 'status';
+
+// Map architecture node IDs to status dependency keys
+const NODE_TO_DEP: Partial<Record<NodeId, string>> = {
+  classcharts:   'classcharts',
+  firestore:     'firestore',
+  gcs:           'gcs',
+  pubsub:        'pubsub',
+  scheduler:     'pubsub',  // scheduler is part of pubsub chain
+  claude:        'anthropic',
+  pushover:      'pushover',
+  gcal:          'gcal',
+  gtasks:        'gtasks',
+  secretmanager: 'secretmanager',
+};
+
+const STATUS_COLOR: Record<string, string> = {
+  ok:      '#22c55e',
+  error:   '#ef4444',
+  unknown: '#94a3b8',
+};
 
 interface FlowStep {
   from: NodeId;
@@ -73,6 +93,24 @@ const LAYERS = [
 export default function ArchitecturePage() {
   const [activeNode, setActiveNode] = useState<NodeId | null>(null);
   const [activeFlow, setActiveFlow] = useState<number | null>(null);
+  const [depStatus, setDepStatus] = useState<Record<string, string>>({});
+  const [lastPoll, setLastPoll] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/status')
+      .then(r => r.json())
+      .then(d => {
+        const hb = d?.heartbeat;
+        if (!hb) return;
+        setLastPoll(hb.polledAt);
+        const mins = Math.floor((Date.now() - new Date(hb.polledAt).getTime()) / 60000);
+        setDepStatus({
+          ...hb.dependencies,
+          pubsub: mins > 15 ? 'error' : (hb.dependencies.pubsub ?? 'ok'),
+        });
+      })
+      .catch(() => {});
+  }, []);
 
   const selectedNode = NODES.find(n => n.id === activeNode);
   const selectedFlow = activeFlow !== null ? FLOWS[activeFlow] : null;
@@ -151,6 +189,21 @@ export default function ArchitecturePage() {
                   zIndex: isActive ? 20 : 10,
                 }}
               >
+                {/* Status dot */}
+                {NODE_TO_DEP[node.id] && (() => {
+                  const depKey = NODE_TO_DEP[node.id]!;
+                  const st = depStatus[depKey] ?? 'unknown';
+                  return (
+                    <div style={{
+                      position: 'absolute', top: -4, right: -4,
+                      width: 10, height: 10, borderRadius: '50%',
+                      background: STATUS_COLOR[st] ?? STATUS_COLOR.unknown,
+                      border: '2px solid var(--bg)',
+                      boxShadow: st === 'ok' ? `0 0 4px ${STATUS_COLOR.ok}` : st === 'error' ? `0 0 4px ${STATUS_COLOR.error}` : 'none',
+                      zIndex: 30,
+                    }} />
+                  );
+                })()}
                 <div style={{ fontSize: 20, lineHeight: 1, marginBottom: 3 }}>{node.icon}</div>
                 <div style={{ fontSize: 11, fontWeight: 700, lineHeight: 1.2 }}>{node.label}</div>
                 <div style={{ fontSize: 9, opacity: 0.8, marginTop: 2, fontWeight: 500 }}>{node.sublabel}</div>
@@ -158,6 +211,18 @@ export default function ArchitecturePage() {
             );
           })}
         </div>
+      {/* Status legend */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: 'var(--surface-2)', borderTop: '1px solid var(--border)', fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+        <div style={{ display: 'flex', gap: 12 }}>
+          {[['#22c55e','OK'], ['#ef4444','Error'], ['#94a3b8','Unknown']].map(([col, label]) => (
+            <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: col as string, display: 'inline-block' }} />
+              {label}
+            </span>
+          ))}
+        </div>
+        <span>{lastPoll ? `Last poll ${new Date(lastPoll).toLocaleTimeString('en-GB')}` : 'No poll data'}</span>
+      </div>
       </div>
 
       {(selectedNode || selectedFlow) && (
@@ -166,10 +231,19 @@ export default function ArchitecturePage() {
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
                 <div style={{ fontSize: 28 }}>{selectedNode.icon}</div>
-                <div>
+                <div style={{ flex: 1 }}>
                   <h3 style={{ fontSize: 16, fontWeight: 700 }}>{selectedNode.label}</h3>
                   <p style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 500 }}>{selectedNode.sublabel}</p>
                 </div>
+                {NODE_TO_DEP[selectedNode.id] && (() => {
+                  const st = depStatus[NODE_TO_DEP[selectedNode.id]!] ?? 'unknown';
+                  return (
+                    <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                      <div style={{ width: 12, height: 12, borderRadius: '50%', background: STATUS_COLOR[st], margin: '0 auto 3px', boxShadow: st !== 'unknown' ? `0 0 5px ${STATUS_COLOR[st]}` : 'none' }} />
+                      <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: STATUS_COLOR[st], fontWeight: 700, textTransform: 'uppercase' }}>{st}</span>
+                    </div>
+                  );
+                })()}
               </div>
               <p style={styles.detailText}>{selectedNode.description}</p>
               <div style={{ marginTop: 12 }}>
