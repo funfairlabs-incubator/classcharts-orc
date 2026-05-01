@@ -173,7 +173,7 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
       <div style={{ padding: '0 20px' }}>
         <TimetableTimeline
           lessons={lessons ?? []}
-          href={`/timetable?pupil=${pupil.id}`}
+          href={`/day`}
           accent={accent}
           compact={!expanded}
         />
@@ -226,7 +226,7 @@ function StudentCard({ pupil, accent, defaultExpanded }: { pupil: CCStudent; acc
           <span style={styles.statSub}>{overdueHw.length > 0 ? 'overdue' : 'to do'}</span>
         </StatCell>
 
-        <StatCell label="Attendance" href={`/attendance?pupil=${pupil.id}`} accent={accent}>
+        <StatCell label="Attendance" href={`/day`} accent={accent}>
           <span style={{ fontSize: 22, fontFamily: 'var(--font-display)', fontWeight: 500, color: attendColor }}>
             {attendPct !== null ? `${attendPct.toFixed(0)}%` : '—'}
           </span>
