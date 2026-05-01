@@ -1,174 +1,210 @@
 'use client';
+import { useState, useEffect } from 'react';
 import { usePupil, useClassChartsData } from '@/lib/usePupil';
 import type { ArchivedAnnouncement, CCAnnouncement } from '@classcharts/shared';
+import Link from 'next/link';
 
 type AnnItem = ArchivedAnnouncement | CCAnnouncement;
 const isArchived = (a: AnnItem): a is ArchivedAnnouncement => 'archivedAt' in a;
 
-export default function AnnouncementsPage() {
-  const { activePupil } = usePupil();
-  const { data: announcements, loading, error } = useClassChartsData<AnnItem[]>(
-    'announcements',
-    { pupilId: String(activePupil?.id ?? '') },
-    [activePupil?.id],
-  );
-
-  const consentPending = (announcements ?? []).filter(a => a.requiresConsent && a.consentGiven === null);
-
-  return (
-    <div style={styles.page}>
-      <div style={{ marginBottom: 24 }}>
-        <p style={styles.eyebrow}>{activePupil?.firstName ?? 'School'}</p>
-        <h1 style={styles.pageTitle}>Announcements</h1>
-      </div>
-
-      {/* Consent action banner */}
-      {consentPending.length > 0 && (
-        <a href="https://app.classcharts.com" target="_blank" rel="noreferrer" style={styles.consentBanner}>
-          <div>
-            <span style={styles.consentTitle}>⚠ {consentPending.length} item{consentPending.length > 1 ? 's' : ''} need your consent</span>
-            <div style={styles.consentList}>
-              {consentPending.map(a => <span key={a.id} style={styles.consentItem}>· {a.title}</span>)}
-            </div>
-          </div>
-          <span style={styles.consentCta}>Open ClassCharts →</span>
-        </a>
-      )}
-
-      <hr style={styles.rule} />
-
-      {loading && <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {[1, 2, 3].map(i => <div key={i} className="card" style={{ height: 140, background: 'var(--surface-2)' }} />)}
-      </div>}
-      {error && <p style={{ color: 'var(--negative)', fontSize: 14 }}>{error}</p>}
-
-      {!loading && !error && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {!announcements?.length && <p style={{ fontSize: 13, color: 'var(--text-3)' }}>No announcements</p>}
-          {(announcements ?? []).map((a, i) => (
-            <AnnouncementCard key={a.id} ann={a} index={i} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AnnouncementCard({ ann, index }: { ann: AnnItem; index: number }) {
-  const archived = isArchived(ann);
-  const consentPending = ann.requiresConsent && ann.consentGiven === null;
-  const consentGiven = ann.requiresConsent && ann.consentGiven === true;
-
-  return (
-    <div className={`card fade-up fade-up-${Math.min(index + 1, 5)}`} style={{
-      padding: 24,
-      borderLeft: consentPending ? '4px solid #f59e0b' : '4px solid transparent',
-    }}>
-      {/* Header row */}
-      <div style={styles.cardHeader}>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          {ann.isPinned && <span className="chip chip--warning">📌 Pinned</span>}
-          {consentPending && <span className="chip chip--warning">⚠ Consent needed</span>}
-          {consentGiven && <span className="chip chip--positive">✓ Consent given</span>}
-          {!ann.isPinned && !ann.requiresConsent && <span className="chip chip--neutral">Info</span>}
-          {archived && ann.requiresAction && !ann.requiresConsent && (
-            <span className="chip chip--warning">Action required</span>
-          )}
-        </div>
-        <span style={styles.date}>{formatDate(ann.timestamp)}</span>
-      </div>
-
-      <h2 style={styles.cardTitle}>{ann.title}</h2>
-      <p style={styles.teacher}>{ann.teacherName} · {ann.schoolName}</p>
-
-      {/* AI summary if archived */}
-      {archived && ann.aiSummary && (
-        <div style={styles.aiSummary}>
-          <span style={styles.aiLabel}>Summary</span>
-          <p style={styles.aiText}>{ann.aiSummary}</p>
-          {ann.actionDescription && (
-            <p style={styles.actionText}>⚠ {ann.actionDescription}</p>
-          )}
-        </div>
-      )}
-
-      {ann.descriptionText && (
-        <>
-          <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '14px 0' }} />
-          <p style={styles.description}>{ann.descriptionText}</p>
-        </>
-      )}
-
-      {/* Attachments — proxied through our API if archived */}
-      {ann.attachments.length > 0 && (
-        <div style={styles.attachments}>
-          <span style={styles.attachLabel}>Attachments</span>
-          {ann.attachments.map((att, ai) => {
-            const gcsPaths = ann.attachmentGcsPaths ?? {};
-            const gcsPath = gcsPaths[att.filename];
-            // If no GCS copy, the original ClassCharts URL will be expired — show as unavailable
-            if (!gcsPath) return (
-              <span key={ai} style={{...styles.attachment, opacity: 0.4, cursor: 'not-allowed'}} title="Attachment not yet archived">
-                {fileIcon(att.filename)} {att.filename} <span style={styles.archivedBadge}>pending</span>
-              </span>
-            );
-            const href = `/api/attachments/${gcsPath}`;
-            return (
-              <a key={ai} href={href} target="_blank" rel="noreferrer" style={styles.attachment}>
-                {fileIcon(att.filename)} {att.filename}
-                <span style={styles.archivedBadge}>archived</span>
-              </a>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Consent action */}
-      {consentPending && (
-        <a href="https://app.classcharts.com" target="_blank" rel="noreferrer" style={styles.consentBtn}>
-          Open ClassCharts to respond →
-        </a>
-      )}
-    </div>
-  );
-}
-
-function fileIcon(filename: string): string {
-  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
-  if (['pdf'].includes(ext)) return '📄';
-  if (['doc', 'docx'].includes(ext)) return '📝';
-  if (['ppt', 'pptx'].includes(ext)) return '📊';
-  if (['xls', 'xlsx'].includes(ext)) return '📈';
-  if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) return '🖼';
+function fileIcon(filename: string) {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  if (ext === 'pdf') return '📄';
+  if (['doc','docx'].includes(ext ?? '')) return '📝';
+  if (['jpg','jpeg','png','gif'].includes(ext ?? '')) return '🖼';
   return '📎';
 }
 
-function formatDate(ts: string) {
-  return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+// Fetch announcements for a single pupil
+function usePupilAnnouncements(pupilId: number | undefined) {
+  return useClassChartsData<AnnItem[]>(
+    'announcements',
+    { pupilId: String(pupilId ?? '') },
+    [pupilId],
+  );
+}
+
+export default function AnnouncementsPage() {
+  const { pupils } = usePupil();
+
+  // Load saved palettes to colour student pills
+  const [savedPalettes, setSavedPalettes] = useState<Record<number, { color: string; bg: string; border: string }>>({});
+  useEffect(() => {
+    try {
+      const p = localStorage.getItem('pupilPalettes');
+      if (p) setSavedPalettes(JSON.parse(p));
+    } catch { /* ignore */ }
+  }, []);
+
+  const DEFAULT_ACCENTS = [
+    { color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
+    { color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' },
+    { color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
+    { color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+  ];
+
+  function accentFor(pupilId: number, idx: number) {
+    return savedPalettes[pupilId] ?? DEFAULT_ACCENTS[idx % DEFAULT_ACCENTS.length];
+  }
+
+  const pupilA = pupils[0];
+  const pupilB = pupils[1];
+
+  const { data: annA } = usePupilAnnouncements(pupilA?.id);
+  const { data: annB } = usePupilAnnouncements(pupilB?.id);
+
+  // Merge and deduplicate by announcement numeric id
+  // Same announcement sent to multiple students → one card with multiple pills
+  const merged = new Map<number, { ann: AnnItem; pupils: Array<{ pupil: typeof pupilA; idx: number }> }>();
+
+  function addToMerged(ann: AnnItem, pupil: typeof pupilA, idx: number) {
+    const key = ann.id;
+    if (merged.has(key)) {
+      merged.get(key)!.pupils.push({ pupil, idx });
+    } else {
+      merged.set(key, { ann, pupils: [{ pupil, idx }] });
+    }
+  }
+
+  (annA ?? []).forEach(a => addToMerged(a, pupilA, 0));
+  (annB ?? []).forEach(a => addToMerged(a, pupilB, 1));
+
+  // Sort by timestamp desc
+  const sorted = [...merged.values()].sort((a, b) => {
+    const ta = isArchived(a.ann) ? a.ann.archivedAt : a.ann.timestamp;
+    const tb = isArchived(b.ann) ? b.ann.archivedAt : b.ann.timestamp;
+    return new Date(tb).getTime() - new Date(ta).getTime();
+  });
+
+  const consentPending = sorted.filter(({ ann }) => ann.requiresConsent && ann.consentGiven === null);
+
+  return (
+    <div style={styles.page}>
+      <div style={{ marginBottom: 16 }}>
+        <p style={styles.eyebrow}>School</p>
+        <h1 style={styles.pageTitle}>Announcements</h1>
+      </div>
+
+      {/* Consent banner */}
+      {consentPending.length > 0 && (
+        <a href="https://app.classcharts.com" target="_blank" rel="noreferrer" style={styles.consentBanner}>
+          <span style={{ fontWeight: 600, color: 'var(--warning)' }}>
+            ⚠ {consentPending.length} item{consentPending.length > 1 ? 's' : ''} need your consent
+          </span>
+          <span style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginTop: 2 }}>
+            Open ClassCharts app to respond
+          </span>
+        </a>
+      )}
+
+      {sorted.map(({ ann, pupils: annPupils }) => {
+        const archived = isArchived(ann);
+        const accent = annPupils.length === 1 ? accentFor(annPupils[0].pupil?.id ?? 0, annPupils[0].idx) : { color: 'var(--text-2)', bg: 'var(--surface-2)', border: 'var(--border)' };
+
+        return (
+          <div key={ann.id} className="card" style={{ marginBottom: 12, overflow: 'hidden' }}>
+            {/* Accent stripe */}
+            <div style={{ height: 3, background: accent.color }} />
+
+            <div style={{ padding: '12px 16px' }}>
+              {/* Header row */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {/* Student pills */}
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+                    {annPupils.map(({ pupil, idx }) => {
+                      if (!pupil) return null;
+                      const a = accentFor(pupil.id, idx);
+                      return (
+                        <span key={pupil.id} style={{
+                          fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100,
+                          background: a.bg, color: a.color, border: `1px solid ${a.border}`,
+                          fontFamily: 'var(--font-mono)',
+                        }}>
+                          {pupil.firstName}
+                        </span>
+                      );
+                    })}
+                    {ann.isPinned && (
+                      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 100, background: '#fef3c7', color: '#b45309', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                        📌 Pinned
+                      </span>
+                    )}
+                  </div>
+                  <p style={styles.annTitle}>{ann.title}</p>
+                  <p style={styles.annMeta}>{ann.teacherName} · {ann.schoolName}</p>
+                </div>
+                <span style={styles.annDate}>
+                  {new Date(isArchived(ann) ? ann.archivedAt : ann.timestamp).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                </span>
+              </div>
+
+              {/* AI summary (archived only) */}
+              {archived && ann.aiSummary && (
+                <p style={styles.aiSummary}>{ann.aiSummary}</p>
+              )}
+
+              {/* Description */}
+              {ann.descriptionText && (
+                <p style={styles.annBody}>{ann.descriptionText}</p>
+              )}
+
+              {/* Action required */}
+              {archived && ann.requiresAction && ann.actionDescription && (
+                <div style={styles.actionBanner}>
+                  <span style={{ fontWeight: 600, color: 'var(--warning)' }}>Action required</span>
+                  <span style={{ color: 'var(--text-2)', marginLeft: 6 }}>{ann.actionDescription}</span>
+                </div>
+              )}
+
+              {/* Attachments */}
+              {ann.attachments.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  <p style={styles.attachLabel}>Attachments</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {ann.attachments.map((att, ai) => {
+                      const gcsPaths = ann.attachmentGcsPaths ?? {};
+                      const gcsPath = gcsPaths[att.filename];
+                      if (!gcsPath) return (
+                        <span key={ai} style={{ ...styles.attachment, opacity: 0.4, cursor: 'not-allowed' }} title="Not yet archived">
+                          {fileIcon(att.filename)} {att.filename}
+                          <span style={styles.chip}>pending</span>
+                        </span>
+                      );
+                      return (
+                        <a key={ai} href={`/api/attachments/${gcsPath}`} target="_blank" rel="noreferrer" style={styles.attachment}>
+                          {fileIcon(att.filename)} {att.filename}
+                          <span style={styles.chip}>archived</span>
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+
+      {sorted.length === 0 && (
+        <p style={{ fontSize: 13, color: 'var(--text-3)', textAlign: 'center', marginTop: 48 }}>No announcements</p>
+      )}
+    </div>
+  );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { maxWidth: 640, margin: '0 auto', padding: '24px 16px 48px' },
-  eyebrow: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 },
-  pageTitle: { fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 500 },
-  rule: { border: 'none', borderTop: '1px solid var(--border)', marginBottom: 24 },
-  consentBanner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, padding: '16px 20px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, marginBottom: 20, textDecoration: 'none', color: 'inherit' },
-  consentTitle: { fontSize: 14, fontWeight: 600, color: '#92400e', display: 'block', marginBottom: 4 },
-  consentList: { display: 'flex', flexDirection: 'column', gap: 2 },
-  consentItem: { fontSize: 12, color: '#92400e', fontFamily: 'var(--font-mono)' },
-  consentCta: { fontSize: 12, fontWeight: 600, color: '#92400e', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', flexShrink: 0 },
-  cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 8 },
-  date: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', flexShrink: 0 },
-  cardTitle: { fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 500, lineHeight: 1.3, marginBottom: 4 },
-  teacher: { fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' },
-  aiSummary: { marginTop: 14, padding: '12px 14px', background: 'var(--surface-2)', borderRadius: 4, border: '1px solid var(--border)' },
-  aiLabel: { fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 6 },
-  aiText: { fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 },
-  actionText: { fontSize: 12, color: '#92400e', marginTop: 6, fontWeight: 500 },
-  description: { fontSize: 13, color: 'var(--text-2)', lineHeight: 1.7, whiteSpace: 'pre-wrap' },
-  attachments: { marginTop: 14, display: 'flex', flexDirection: 'column', gap: 6 },
-  attachLabel: { fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 2 },
-  attachment: { fontSize: 12, color: 'var(--info)', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' },
-  archivedBadge: { fontSize: 9, padding: '1px 5px', background: 'var(--positive-bg)', color: 'var(--positive)', borderRadius: 3, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em' },
-  consentBtn: { display: 'inline-flex', alignItems: 'center', marginTop: 16, padding: '8px 16px', background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', borderRadius: 4, fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-mono)', textDecoration: 'none' },
+  page: { maxWidth: 640, margin: '0 auto', padding: '12px 12px 56px' },
+  eyebrow: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 2 },
+  pageTitle: { fontSize: 22, fontWeight: 700 },
+  consentBanner: { display: 'block', padding: '12px 16px', background: 'var(--warning-bg)', border: '1px solid var(--warning)', borderRadius: 8, marginBottom: 16, textDecoration: 'none' },
+  annTitle: { fontSize: 15, fontWeight: 600, marginBottom: 2 },
+  annMeta: { fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' },
+  annDate: { fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', flexShrink: 0 },
+  aiSummary: { fontSize: 13, color: 'var(--text-2)', fontStyle: 'italic', marginBottom: 6, lineHeight: 1.5 },
+  annBody: { fontSize: 13, color: 'var(--text)', lineHeight: 1.5, marginTop: 6 },
+  actionBanner: { marginTop: 8, padding: '6px 10px', background: 'var(--warning-bg)', borderRadius: 4, fontSize: 12 },
+  attachLabel: { fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 },
+  attachment: { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text)', textDecoration: 'none', padding: '4px 8px', background: 'var(--surface-2)', borderRadius: 4, border: '1px solid var(--border)' },
+  chip: { fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'var(--positive-bg)', color: 'var(--positive)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em' },
 };
