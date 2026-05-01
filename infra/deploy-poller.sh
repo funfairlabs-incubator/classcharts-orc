@@ -13,6 +13,7 @@ cd "$(dirname "$0")/.."
 gcloud builds submit \
   --config cloudbuild.yaml \
   --substitutions="_IMAGE=${IMAGE}" \
+  --suppress-logs \
   .
 
 echo "▶ Deploying to Cloud Run..."
