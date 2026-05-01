@@ -84,3 +84,7 @@ a { color: inherit; text-decoration: none; }
 .fade-up-3 { animation-delay: 0.15s; opacity: 0; }
 .fade-up-4 { animation-delay: 0.2s;  opacity: 0; }
 .fade-up-5 { animation-delay: 0.25s; opacity: 0; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
