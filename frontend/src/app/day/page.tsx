@@ -233,7 +233,7 @@ export default function DayPage() {
       {/* Header */}
       <div style={styles.pageHeader}>
         <div>
-          <p style={styles.eyebrow}>Day View</p>
+          <p style={styles.eyebrow}>Timetable & Attendance</p>
           <h1 style={styles.pageTitle}>
             {new Date(selectedDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}
           </h1>
