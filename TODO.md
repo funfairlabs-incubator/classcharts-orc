@@ -2,9 +2,11 @@
 
 ## 🔴 Security — High Priority
 
-- [x] **Delete `/api/debug-headers`** — unauthenticated route exposes all request headers including cookies, auth tokens and internal GCP headers. No legitimate use in production.
+- [x] **Delete `/api/debug-headers`** — unauthenticated route exposed all request headers including cookies, auth tokens and internal GCP headers. No legitimate use in production.
+  - Fixed in PR #44: file deleted entirely. No callers in codebase. Verified no references remain.
 
-- [x] **Attachment path traversal** — `/api/attachments/[...path]` joins params with no sanitisation. A crafted request to `../config/allowed-users.json` could read any GCS file in the bucket. Fix: validate path starts with `attachments/`.
+- [x] **Attachment path traversal** — `/api/attachments/[...path]` joined params with no sanitisation. A crafted request to `../config/allowed-users.json` could read any GCS file in the bucket.
+  - Fixed in PR #44: two-check validation added before GCS call — `gcsPath.startsWith('attachments/')` and `!gcsPath.includes('..')`. All attack vectors tested: direct traversal, prefix bypass, deep traversal — all blocked. Valid attachment paths unaffected.
 
 ## 🟡 Security — Medium Priority
 
