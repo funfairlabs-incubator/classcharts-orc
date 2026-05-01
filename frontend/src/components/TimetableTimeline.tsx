@@ -231,7 +231,7 @@ export function TimetableTimeline({ lessons, href, accent, compact = false }: Pr
           </div>
 
           <div style={{ padding: '0 0 4px', textAlign: 'right' }}>
-            <Link href={href} style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>Full timetable →</Link>
+            <Link href={href} style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>Timetable & Attendance →</Link>
           </div>
         </>
       )}
