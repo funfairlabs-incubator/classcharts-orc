@@ -4,6 +4,7 @@ import { usePupil, useClassChartsData } from '@/lib/usePupil';
 import type { CCStudent, CCLesson, CCActivityPoint, CCHomework, CCAttendanceSummary, CCAnnouncement, UpcomingEvent, ArchivedAnnouncement } from '@classcharts/shared';
 import Link from 'next/link';
 import { TimetableTimeline } from '@/components/TimetableTimeline';
+import { usePullToRefresh, PullToRefreshIndicator } from '@/hooks/usePullToRefresh';
 import { DemoStudentCard } from '@/components/DemoStudentCard';
 
 // One accent colour per student slot — warm, distinct, accessible
@@ -19,6 +20,8 @@ export default function OverviewPage() {
   const [savedPalettes, setSavedPalettes] = useState<Record<number, typeof STUDENT_ACCENTS[0]>>({});
   const [demoMode, setDemoMode] = useState(false);
   const [demoPalette, setDemoPalette] = useState(STUDENT_ACCENTS[2]);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const ptr = usePullToRefresh({ onRefresh: async () => setRefreshKey(k => k + 1) });
   useEffect(() => {
     try {
       if (localStorage.getItem('demoMode') === 'true') setDemoMode(true);
@@ -44,6 +47,7 @@ export default function OverviewPage() {
   if (loading) return <LoadingState />;
   if (!pupils.length) return (
     <div style={styles.page}>
+      <PullToRefreshIndicator {...ptr} />
       <PageHeader />
       <p style={{ color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>No pupils found.</p>
     </div>
@@ -51,6 +55,7 @@ export default function OverviewPage() {
 
   return (
     <div style={styles.page}>
+      <PullToRefreshIndicator {...ptr} />
       <PageHeader />
       <div style={styles.grid}>
         {pupils.map((pupil, i) => (

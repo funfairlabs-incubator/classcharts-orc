@@ -41,6 +41,9 @@ jobs:
       - name: TypeScript check
         run: cd poller && npx tsc --noEmit
 
+      - name: Build check
+        run: cd poller && npm run build
+
   deploy:
     name: Build & deploy Cloud Run poller
     runs-on: ubuntu-latest
