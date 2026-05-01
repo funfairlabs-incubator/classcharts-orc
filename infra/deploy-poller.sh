@@ -59,3 +59,17 @@ gcloud run services add-iam-policy-binding "$SERVICE" \
   --project="$PROJECT_ID" \
   --quiet
 echo "✅ IAM binding confirmed"
+
+# Verify Pub/Sub subscription push endpoint is correct
+echo ""
+echo "▶ Verifying Pub/Sub subscription..."
+PUSH_URL=$(gcloud pubsub subscriptions describe classcharts-poll-sub   --project="$PROJECT_ID"   --format="value(pushConfig.pushEndpoint)" 2>/dev/null || echo "not found")
+EXPECTED_URL="https://classcharts-poller-306745837103.europe-west2.run.app/"
+if [ "$PUSH_URL" != "$EXPECTED_URL" ]; then
+  echo "⚠ Push endpoint mismatch: $PUSH_URL"
+  echo "  Updating to: $EXPECTED_URL"
+  gcloud pubsub subscriptions modify-push-config classcharts-poll-sub     --push-endpoint="$EXPECTED_URL"     --push-auth-service-account="classcharts-poller-sa@${PROJECT_ID}.iam.gserviceaccount.com"     --project="$PROJECT_ID"
+  echo "✅ Subscription push endpoint updated"
+else
+  echo "✅ Subscription push endpoint correct: $PUSH_URL"
+fi
