@@ -15,20 +15,83 @@ interface StatusResponse {
   error?: string;
 }
 
-const DEPENDENCY_LABELS: Record<string, string> = {
-  classcharts: 'ClassCharts API',
-  firestore: 'Firestore',
-  anthropic: 'Anthropic (AI summaries)',
-  pushover: 'Pushover (notifications)',
-  pubsub: 'Pub/Sub',
-};
+interface DependencyInfo {
+  label: string;
+  what: string;
+  why: string;
+  when: string;
+  with: string;
+  degradesGracefully?: boolean;
+}
 
-const DEPENDENCY_DOCS: Record<string, string> = {
-  classcharts: 'TES SSO login + ClassCharts API. Breaks when TES changes auth flow.',
-  firestore: 'State + announcement archive storage. Required for all data persistence.',
-  anthropic: 'Announcement and homework summarisation. Degrades gracefully if unavailable.',
-  pushover: 'Push notifications to parents. Degrades gracefully if unavailable.',
-  pubsub: 'Cloud Scheduler → Pub/Sub → Cloud Run trigger chain. If poller goes stale, check subscription push endpoint and IAM binding. Both are re-verified on every poller deploy.',
+const DEPENDENCIES: Record<string, DependencyInfo> = {
+  classcharts: {
+    label: 'ClassCharts API',
+    what: 'School data — timetable, homework, behaviour, attendance, announcements, detentions',
+    why: 'Core data source. Without it the poller cannot fetch any pupil data.',
+    when: 'Every 5 minutes via the poller. Frontend proxies live data on demand.',
+    with: 'TES SSO handshake (session.tes.com) then ClassCharts REST API (classcharts.com/apiv2parent). Uses classcharts-api library with custom TES login. Breaks when TES changes auth flow.',
+  },
+  firestore: {
+    label: 'Firestore',
+    what: 'Poll state, announcement archive, attachment metadata, poller heartbeat',
+    why: 'Required for all persistence. Without it the poller re-sends every notification on every poll and the frontend cannot show archived announcements or documents.',
+    when: 'Read at poll start (state), written after every change. Frontend reads on every page load.',
+    with: 'Google Cloud Firestore via @google-cloud/firestore. Project: classcharts. Collections: poll_state, announcements, attachments, status.',
+  },
+  gcs: {
+    label: 'Cloud Storage (GCS)',
+    what: 'Attachment files (PDFs, converted docs), allowed-users.json, user-prefs.json',
+    why: 'Permanent storage for school documents. Without it attachments cannot be saved or served. Auth config cannot be read.',
+    when: 'Written when new attachments are downloaded. Read by frontend on Documents page and at auth time.',
+    with: 'Google Cloud Storage via @google-cloud/storage. Bucket: classcharts-attachments. LibreOffice used for docx/pptx/xlsx → PDF conversion before upload.',
+  },
+  pubsub: {
+    label: 'Pub/Sub + Cloud Scheduler',
+    what: 'Trigger chain: Cloud Scheduler → Pub/Sub topic → push subscription → Cloud Run',
+    why: 'Without it the poller never fires and all data goes stale. IAM binding and subscription push endpoint must be correct.',
+    when: 'Every 5 minutes (scheduled poll) and 3pm weekdays (homework digest).',
+    with: 'Cloud Scheduler publishes to classcharts-poll topic. Pub/Sub push subscription delivers to Cloud Run via HTTP POST with OIDC token. IAM binding (roles/run.invoker) re-granted on every deploy. Subscription endpoint verified and auto-fixed on every deploy.',
+  },
+  anthropic: {
+    label: 'Anthropic API (Claude)',
+    what: 'Announcement summarisation, calendar event extraction, action detection, homework digest',
+    why: 'Enriches notifications — summaries, calendar events, required action flags. Degrades gracefully.',
+    when: 'Called for each new announcement and at 3pm for the homework digest.',
+    with: 'claude-sonnet-4-6 via https://api.anthropic.com/v1/messages. API key from Secret Manager. Rate limit: ~65s inter-topic delay for bulk operations.',
+    degradesGracefully: true,
+  },
+  pushover: {
+    label: 'Pushover',
+    what: 'Push notifications to parents for new homework, behaviour, announcements, attendance alerts',
+    why: 'Real-time alerts. Degrades gracefully — data is still archived to Firestore if Pushover fails.',
+    when: 'Called for each new event detected by the poller.',
+    with: 'https://api.pushover.net/1/messages.json. Per-parent toggles in user-prefs.json control which events trigger notifications.',
+    degradesGracefully: true,
+  },
+  gcal: {
+    label: 'Google Calendar',
+    what: 'Calendar events extracted from announcements by Claude, homework due dates',
+    why: 'Adds school events to family calendar automatically. Degrades gracefully.',
+    when: 'Called when Claude identifies calendar events in new announcements.',
+    with: 'Google Calendar API via googleapis. One calendar per pupil. Refresh token from Secret Manager. Event titles updated when homework status changes.',
+    degradesGracefully: true,
+  },
+  gtasks: {
+    label: 'Google Tasks',
+    what: 'Homework items as tasks with due dates, status synced back from ClassCharts',
+    why: 'Makes homework actionable in Google Calendar/Tasks apps. Degrades gracefully.',
+    when: 'Called for each new homework item. Status updated when ClassCharts reports completion.',
+    with: 'Google Tasks API via googleapis. One task list per pupil. Refresh token from Secret Manager.',
+    degradesGracefully: true,
+  },
+  secretmanager: {
+    label: 'Secret Manager',
+    what: 'All credentials — ClassCharts passwords, Google OAuth keys, Pushover keys, Anthropic API key',
+    why: 'Required at startup. Without it the poller cannot log in to anything.',
+    when: 'Read once at poller startup and at frontend deploy time (written to app.yaml env vars).',
+    with: 'Google Cloud Secret Manager. Project: classcharts. Accessed via gcloud CLI in deploy scripts and via @google-cloud/secret-manager in the poller.',
+  },
 };
 
 function ago(ts: string): string {
@@ -51,6 +114,7 @@ export default function StatusPage() {
   const [loading, setLoading] = useState(true);
 
   const [triggering, setTriggering] = useState(false);
+  const [expandedDep, setExpandedDep] = useState<string | null>(null);
   const [triggerResult, setTriggerResult] = useState<string | null>(null);
 
   async function triggerPoll() {
@@ -84,8 +148,15 @@ export default function StatusPage() {
   const staleMins = hb ? Math.floor((Date.now() - new Date(hb.polledAt).getTime()) / 60000) : 0;
   const displayDeps = hb ? {
     ...hb.dependencies,
+    // If stale, Pub/Sub trigger chain is implicitly broken
     pubsub: staleMins > 15 ? 'error' : (hb.dependencies.pubsub ?? 'ok'),
-  } : {};
+    // Ensure all known deps appear even if poller didn't report them
+    ...Object.fromEntries(
+      Object.keys(DEPENDENCIES)
+        .filter(k => !(k in (hb.dependencies ?? {})))
+        .map(k => [k, 'unknown'])
+    ),
+  } : Object.fromEntries(Object.keys(DEPENDENCIES).map(k => [k, 'unknown']));
   const allOk = hb ? Object.values(displayDeps).every(v => v === 'ok') && staleMins <= 15 : false;
 
   return (
@@ -184,28 +255,50 @@ export default function StatusPage() {
             <div style={{ padding: '10px 16px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
               <span style={styles.sectionLabel}>Dependencies</span>
             </div>
-            {Object.entries(displayDeps).map(([key, val], i, arr) => (
-              <div key={key} style={{
-                padding: '12px 16px',
-                borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none',
-                display: 'flex', alignItems: 'center', gap: 10,
-                borderLeft: `3px solid ${val === 'ok' ? 'var(--positive)' : 'var(--negative)'}`,
-              }}>
-                <span style={{ fontSize: 16, flexShrink: 0 }}>{val === 'ok' ? '✓' : '✗'}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 13, fontWeight: 600 }}>{DEPENDENCY_LABELS[key] ?? key}</p>
-                  <p style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: 1.4 }}>{DEPENDENCY_DOCS[key] ?? ''}</p>
+            {Object.entries(displayDeps).map(([key, val], i, arr) => {
+              const dep = DEPENDENCIES[key];
+              const isExpanded = expandedDep === key;
+              return (
+                <div key={key} style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                  <button onClick={() => setExpandedDep(isExpanded ? null : key)} style={{
+                    width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer',
+                    padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10,
+                    borderLeft: `3px solid ${val === 'ok' ? 'var(--positive)' : val === 'unknown' ? 'var(--border)' : 'var(--negative)'}`,
+                  }}>
+                    <span style={{ fontSize: 14, flexShrink: 0, color: val === 'ok' ? 'var(--positive)' : val === 'unknown' ? 'var(--text-3)' : 'var(--negative)' }}>{val === 'ok' ? '✓' : val === 'unknown' ? '?' : '✗'}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600 }}>{dep?.label ?? key}</p>
+                      <p style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dep?.what ?? ''}</p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      {dep?.degradesGracefully && <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', padding: '1px 5px', borderRadius: 3, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>graceful</span>}
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)',
+                        color: val === 'ok' ? 'var(--positive)' : val === 'unknown' ? 'var(--text-3)' : 'var(--negative)',
+                        padding: '2px 8px', borderRadius: 4,
+                        background: val === 'ok' ? 'var(--positive-bg)' : val === 'unknown' ? 'var(--surface-2)' : 'var(--negative-bg)',
+                      }}>{String(val).toUpperCase()}</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{isExpanded ? '▲' : '▼'}</span>
+                    </div>
+                  </button>
+                  {isExpanded && dep && (
+                    <div style={{ padding: '0 16px 14px 16px', borderLeft: `3px solid ${val === 'ok' ? 'var(--positive)' : val === 'unknown' ? 'var(--border)' : 'var(--negative)'}`, background: 'var(--surface-2)' }}>
+                      {[
+                        { label: 'What', value: dep.what },
+                        { label: 'Why', value: dep.why },
+                        { label: 'When', value: dep.when },
+                        { label: 'With', value: dep.with },
+                      ].map(({ label, value }) => (
+                        <div key={label} style={{ marginBottom: 8 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginRight: 8 }}>{label}</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.5 }}>{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <span style={{
-                  fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)',
-                  color: val === 'ok' ? 'var(--positive)' : 'var(--negative)',
-                  padding: '2px 8px', borderRadius: 4,
-                  background: val === 'ok' ? 'var(--positive-bg)' : 'var(--negative-bg)',
-                }}>
-                  {val.toUpperCase()}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Recent errors */}
