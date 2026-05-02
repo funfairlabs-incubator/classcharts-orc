@@ -13,6 +13,8 @@ interface StatusResponse {
   heartbeat: Heartbeat | null;
   fetchedAt: string;
   error?: string;
+  pollerHealth?: { ok: boolean; latencyMs?: number };
+  expectedPushEndpoint?: string;
 }
 
 interface DependencyInfo {
