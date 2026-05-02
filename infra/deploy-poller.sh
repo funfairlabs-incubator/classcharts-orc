@@ -60,6 +60,16 @@ gcloud run services add-iam-policy-binding "$SERVICE" \
   --quiet
 echo "✅ IAM binding confirmed"
 
+# Grant github-actions SA permission to manage Pub/Sub subscriptions
+echo "▶ Granting Pub/Sub editor to github-actions SA..."
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:github-actions@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --role="roles/pubsub.editor" \
+  --condition=None \
+  --quiet \
+  && echo "✅ Pub/Sub editor granted" \
+  || echo "⚠ Could not grant Pub/Sub editor — may need manual setup"
+
 # Verify and fix Pub/Sub subscription push endpoint
 echo ""
 echo "▶ Verifying Pub/Sub subscription..."
@@ -75,8 +85,9 @@ if [ "$PUSH_URL" != "$EXPECTED_URL" ]; then
   gcloud pubsub subscriptions modify-push-config "$SUB" \
     --push-endpoint="$EXPECTED_URL" \
     --push-auth-service-account="classcharts-poller-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
-    --project="$PROJECT_ID"
-  echo "✅ Subscription endpoint updated"
+    --project="$PROJECT_ID" \
+    && echo "✅ Subscription endpoint updated" \
+    || echo "⚠ Could not update subscription — grant github-actions@classcharts.iam.gserviceaccount.com roles/pubsub.editor"
 else
   echo "✅ Subscription endpoint correct"
 fi
