@@ -7,6 +7,7 @@ app.use(express.json());
 
 app.post('/', async (req, res) => {
   res.status(200).send('OK'); // ack immediately
+  console.log('Request received, body:', JSON.stringify(req.body).slice(0, 200));
 
   try {
     // Decode Pub/Sub message
@@ -17,13 +18,16 @@ app.post('/', async (req, res) => {
     const trigger = body?.trigger ?? 'scheduled';
     console.log(`Received trigger: ${trigger}`);
 
+    console.log('Starting poll, trigger:', trigger);
     if (trigger === 'digest') {
       await sendHomeworkDigest();
     } else {
       await pollClassCharts();
     }
+    console.log('Poll completed successfully');
   } catch (err) {
-    console.error('Poll error:', err);
+    console.error('Poll error:', String(err));
+    console.error('Stack:', err instanceof Error ? err.stack : 'no stack');
     // Write crash to Firestore so status page can show it
     try {
       const { Firestore } = await import('@google-cloud/firestore');
@@ -35,8 +39,9 @@ app.post('/', async (req, res) => {
         errors: [`CRASH: ${String(err)}`],
         updatedAt: new Date().toISOString(),
       });
+      console.log('Crash written to Firestore');
     } catch (fsErr) {
-      console.error('Failed to write crash to Firestore:', fsErr);
+      console.error('Failed to write crash to Firestore:', String(fsErr));
     }
   }
 });
