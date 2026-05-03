@@ -15,8 +15,8 @@ function usePollerStatus(): TrafficLight {
         const hb = d?.heartbeat;
         if (!hb) { setLight('unknown'); return; }
 
-        const errors = Object.values(hb.dependencies ?? {}).some(v => v === 'error');
         const mins = Math.floor((Date.now() - new Date(hb.polledAt).getTime()) / 60000);
+        const errors = Object.values(hb.dependencies ?? {}).some(v => v === 'error');
 
         if (errors || mins > 15) setLight('red');
         else if (mins > 7)       setLight('amber');
