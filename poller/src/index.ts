@@ -24,10 +24,36 @@ app.post('/', async (req, res) => {
     }
   } catch (err) {
     console.error('Poll error:', err);
+    // Write crash to Firestore so status page can show it
+    try {
+      const { Firestore } = await import('@google-cloud/firestore');
+      const db = new Firestore({ projectId: process.env.GCP_PROJECT_ID });
+      await db.collection('status').doc('poller').set({
+        polledAt: new Date().toISOString(),
+        pupils: [],
+        dependencies: { classcharts: 'error', firestore: 'ok', pubsub: 'ok', anthropic: 'ok', pushover: 'ok', gcs: 'ok', gcal: 'ok', gtasks: 'ok', secretmanager: 'ok' },
+        errors: [`CRASH: ${String(err)}`],
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (fsErr) {
+      console.error('Failed to write crash to Firestore:', fsErr);
+    }
   }
 });
 
-app.get('/health', (_req, res) => res.json({ ok: true, version: '3' }));
+app.get('/health', (_req, res) => res.json({ ok: true, version: '4' }));
+
+// Return last error from status doc for remote debugging
+app.get('/last-error', async (_req, res) => {
+  try {
+    const { Firestore } = await import('@google-cloud/firestore');
+    const db = new Firestore({ projectId: process.env.GCP_PROJECT_ID });
+    const doc = await db.collection('status').doc('poller').get();
+    res.json(doc.exists ? doc.data() : { error: 'No status doc' });
+  } catch (err) {
+    res.json({ error: String(err) });
+  }
+});
 
 // Manual trigger for testing — requires same auth as Pub/Sub
 app.post('/trigger', async (_req, res) => {
