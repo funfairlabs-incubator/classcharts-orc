@@ -247,7 +247,8 @@ export default function StatusPage() {
                   </p>
                   {status?.pollerHealth && (
                     <p style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: status.pollerHealth.ok ? 'var(--positive)' : 'var(--negative)', marginTop: 4 }}>
-                      Container: {status.pollerHealth.ok ? `✓ healthy (${status.pollerHealth.latencyMs}ms)` : '✗ unreachable'}
+                      {status.pollerHealth.ok ? '✓ Container healthy' : '✗ Container stale'}
+                      {status.pollerHealth.latencyMs ? ` (${status.pollerHealth.latencyMs}ms)` : ' (inferred from heartbeat)'}
                     </p>
                   )}
                 </div>
