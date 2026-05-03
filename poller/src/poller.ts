@@ -304,7 +304,7 @@ ${(err as any)?.stack ?? ''}`,
       gtasks:         pollErrors.some(e => e.includes('Task') || e.includes('task') || e.includes('tasksConfig')) ? 'error' : 'ok',
       secretmanager:  'ok', // If poller started, secrets were read successfully
     },
-    errors: pollErrors.length > 0 ? pollErrors.slice(-10) : undefined,
+    errors: pollErrors.slice(-10),
   });
   console.log('Heartbeat written to Firestore');
   } catch (err) { console.error('Failed to write heartbeat:', err); }
