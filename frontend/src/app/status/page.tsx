@@ -160,14 +160,14 @@ export default function StatusPage() {
     ...hb.dependencies,
     // If stale, Pub/Sub trigger chain is implicitly broken
     pubsub: staleMins > 15 ? 'error' : (hb.dependencies.pubsub ?? 'ok'),
-    cloudrun: cloudRunOk === true ? 'ok' : cloudRunOk === false ? 'error' : staleMins <= 7 ? 'ok' : 'unknown',
+    cloudrun: staleMins <= 15 ? 'ok' : 'error',
     // Ensure all known deps appear even if poller didn't report them
     ...Object.fromEntries(
       Object.keys(DEPENDENCIES)
         .filter(k => !(k in (hb.dependencies ?? {})))
         .map(k => [k, 'unknown'])
     ),
-  } : Object.fromEntries(Object.keys(DEPENDENCIES).map(k => [k, 'unknown']));
+  } : Object.fromEntries(Object.keys(DEPENDENCIES).map(k => [k, 'unknown' as const]));
   const allOk = hb ? Object.values(displayDeps).every(v => v === 'ok') && staleMins <= 15 : false;
 
   return (
