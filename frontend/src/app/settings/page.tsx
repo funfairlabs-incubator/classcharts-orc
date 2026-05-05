@@ -128,17 +128,32 @@ export default function SettingsPage() {
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') { setNotifStatus('denied'); return; }
       const messaging = getFirebaseMessaging();
-      if (!messaging) { setNotifStatus('error'); return; }
+      if (!messaging) { console.error('FCM: getFirebaseMessaging() returned null'); setNotifStatus('error'); return; }
+
+      // Explicitly register the service worker — don't assume it's already registered
+      let swReg: ServiceWorkerRegistration | undefined;
+      try {
+        swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+        await swReg.update();
+        console.log('FCM: service worker registered', swReg.scope);
+      } catch (swErr) {
+        console.error('FCM: service worker registration failed', swErr);
+        setNotifStatus('error');
+        return;
+      }
+
       const token = await getToken(messaging, {
         vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
-        serviceWorkerRegistration: await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js'),
+        serviceWorkerRegistration: swReg,
       });
+      console.log('FCM: token obtained', token ? token.slice(0, 20) + '…' : 'null');
       if (!token) { setNotifStatus('error'); return; }
       const res = await fetch('/api/fcm-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
       });
+      console.log('FCM: token saved', res.status);
       setNotifStatus(res.ok ? 'registered' : 'error');
     } catch (err) {
       console.error('FCM registration failed:', err);
