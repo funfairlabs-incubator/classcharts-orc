@@ -185,7 +185,7 @@ Push notifications are migrating from Pushover to Firebase Cloud Messaging (FCM)
 Each parent visits `/settings` and taps **Enable notifications on this device**. This registers an FCM token stored per-user in `config/user-prefs.json` in GCS.
 
 **Cutover:**  
-After a week of parallel running, set `PUSHOVER_ENABLED=false` in Secret Manager (no redeploy needed — poller reads it at runtime). Then remove `PUSHOVER_API_TOKEN` and `PUSHOVER_USER_KEY` secrets on the next PR.
+After a week of parallel running, set `PUSHOVER_ENABLED=false` in Secret Manager (no redeploy needed — poller reads it at runtime). The Pushover dependency will show as `–` (disabled) on the status page rather than red. Then remove `PUSHOVER_API_TOKEN` and `PUSHOVER_USER_KEY` secrets on the next PR.
 
 ---
 
