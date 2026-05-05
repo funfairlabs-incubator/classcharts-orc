@@ -2,6 +2,8 @@
 import { useSession } from 'next-auth/react';
 import { useEffect, useRef, useState } from 'react';
 import { usePupil } from '@/lib/usePupil';
+import { getFirebaseMessaging } from '@/lib/firebase';
+import { getToken } from 'firebase/messaging';
 
 interface NotificationPrefs {
   homeworkDigest: boolean;
@@ -49,6 +51,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState<'idle'|'sending'|'ok'|'error'>('idle');
+  const [notifStatus, setNotifStatus] = useState<'unknown'|'granted'|'denied'|'registering'|'registered'|'error'>('unknown');
   const { pupils } = usePupil();
   const [palettes, setPalettes] = useState<Record<number, ReturnType<typeof paletteFromHex>>>({});
   const [themeColour, setThemeColour] = useState('#f97316');
@@ -119,6 +122,30 @@ export default function SettingsPage() {
     setTimeout(() => setTesting('idle'), 4000);
   }
 
+  async function registerFcmToken() {
+    setNotifStatus('registering');
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') { setNotifStatus('denied'); return; }
+      const messaging = getFirebaseMessaging();
+      if (!messaging) { setNotifStatus('error'); return; }
+      const token = await getToken(messaging, {
+        vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+        serviceWorkerRegistration: await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js'),
+      });
+      if (!token) { setNotifStatus('error'); return; }
+      const res = await fetch('/api/fcm-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+      setNotifStatus(res.ok ? 'registered' : 'error');
+    } catch (err) {
+      console.error('FCM registration failed:', err);
+      setNotifStatus('error');
+    }
+  }
+
   function applyThemeColour(colour: string) {
     let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement;
     if (!meta) {
@@ -186,25 +213,30 @@ export default function SettingsPage() {
       </header>
 
       <div className="card" style={styles.section}>
-        <h2 style={styles.sectionTitle}>Pushover Key</h2>
+        <h2 style={styles.sectionTitle}>Push Notifications</h2>
         <p style={styles.sectionDesc}>
-          Your personal Pushover user key. Find it at{' '}
-          <a href="https://pushover.net" target="_blank" rel="noreferrer" style={styles.link}>pushover.net</a>.
-          Leave blank to use the shared account key.
+          Enable push notifications for this device. You&apos;ll be prompted to allow notifications — tap Allow when asked.
+          {notifStatus === 'denied' && <span style={{ color: 'var(--negative)', display: 'block', marginTop: 6 }}>
+            Notifications are blocked in your browser settings. Enable them for this site then try again.
+          </span>}
         </p>
-        <input
-          style={styles.input}
-          type="text"
-          placeholder="u_xxxxxxxxxxxxxxxxxxxxx (optional)"
-          value={pushoverKey}
-          onChange={e => { setPushoverKey(e.target.value); setSaved(false); }}
-          spellCheck={false}
-        />
+        <button
+          style={{
+            padding: '10px 18px', borderRadius: 6, border: '1px solid var(--border)',
+            fontSize: 13, fontWeight: 600, cursor: notifStatus === 'registering' ? 'default' : 'pointer',
+            background: notifStatus === 'registered' || notifStatus === 'granted' ? 'var(--positive-bg)' : notifStatus === 'error' || notifStatus === 'denied' ? 'var(--negative-bg)' : 'var(--surface-2)',
+            color: notifStatus === 'registered' || notifStatus === 'granted' ? 'var(--positive)' : notifStatus === 'error' || notifStatus === 'denied' ? 'var(--negative)' : 'var(--text)',
+          }}
+          onClick={registerFcmToken}
+          disabled={notifStatus === 'registering' || notifStatus === 'registered'}
+        >
+          {notifStatus === 'registering' ? 'Registering…' : notifStatus === 'registered' ? '✓ Notifications enabled' : notifStatus === 'granted' ? '✓ Already enabled — re-register' : notifStatus === 'denied' ? '✕ Blocked — check browser settings' : notifStatus === 'error' ? '✕ Failed — try again' : '🔔 Enable notifications on this device'}
+        </button>
       </div>
 
       <div className="card" style={styles.section}>
         <h2 style={styles.sectionTitle}>Notifications</h2>
-        <p style={styles.sectionDesc}>Choose which events send a Pushover notification to you.</p>
+        <p style={styles.sectionDesc}>Choose which events send a push notification to you.</p>
         <div style={styles.toggleList}>
           {TOGGLE_META.map(({ key, label, desc }) => (
             <div key={key} style={styles.toggleRow} onClick={() => toggle(key)}>
@@ -227,7 +259,7 @@ export default function SettingsPage() {
       <div className="card" style={{ padding: '20px 24px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
         <div>
           <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>Test notification</p>
-          <p style={{ fontSize: 12, color: 'var(--text-2)' }}>Send a test Pushover to confirm everything is working</p>
+          <p style={{ fontSize: 12, color: 'var(--text-2)' }}>Send a test notification to confirm everything is working</p>
         </div>
         <button
           style={{
@@ -240,7 +272,7 @@ export default function SettingsPage() {
           onClick={testNotification}
           disabled={testing === 'sending'}
         >
-          {testing === 'idle' ? '📱 Send test' : testing === 'sending' ? 'Sending…' : testing === 'ok' ? '✓ Delivered' : '✕ Failed'}
+          {testing === 'idle' ? '🔔 Send test' : testing === 'sending' ? 'Sending…' : testing === 'ok' ? '✓ Delivered' : '✕ Failed'}
         </button>
       </div>
 

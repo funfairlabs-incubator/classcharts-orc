@@ -187,7 +187,8 @@ export interface AllowedUsersConfig {
 
 export interface UserNotificationPrefs {
   email: string;
-  pushoverKey?: string;           // their personal Pushover user key
+  pushoverKey?: string;           // their personal Pushover user key (deprecated — kept for parallel-run cutover)
+  fcmTokens?: string[];           // FCM device tokens registered via the web app
   notifications: {
     homeworkDigest: boolean;      // 3pm daily digest of upcoming homework
     homeworkStatusChange: boolean;// when homework marked submitted

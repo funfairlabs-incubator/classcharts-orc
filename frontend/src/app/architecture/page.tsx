@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 
 type NodeId =
   | 'classcharts' | 'scheduler' | 'pubsub' | 'poller' | 'firestore'
-  | 'gcs' | 'secretmanager' | 'frontend' | 'browser' | 'pushover'
+  | 'gcs' | 'secretmanager' | 'frontend' | 'browser' | 'fcm'
   | 'gcal' | 'gtasks' | 'claude' | 'status';
 
 // Map architecture node IDs to status dependency keys
@@ -14,7 +14,7 @@ const NODE_TO_DEP: Partial<Record<NodeId, string>> = {
   pubsub:        'pubsub',
   scheduler:     'pubsub',  // scheduler is part of pubsub chain
   claude:        'anthropic',
-  pushover:      'pushover',
+  fcm:           'fcm',
   gcal:          'gcal',
   gtasks:        'gtasks',
   secretmanager: 'secretmanager',
@@ -50,15 +50,15 @@ const NODES: ArchNode[] = [
   { id: 'classcharts',   label: 'ClassCharts',     sublabel: 'TES SSO + API',        icon: '🏫', color: '#16a34a', bg: '#dcfce7', x: 50,  y: 4,  description: 'The official ClassCharts parent API, now using TES SSO authentication. Login performs a manual TES handshake before accessing ClassCharts. Provides pupils, timetable, homework, behaviour, attendance, announcements and detentions. Polled every 5 minutes.' },
   { id: 'scheduler',     label: 'Cloud Scheduler', sublabel: 'GCP',                  icon: '⏰', color: '#7c3aed', bg: '#ede9fe', x: 10,  y: 22, description: 'Two jobs: every 5 minutes triggers a standard poll, and at 3pm weekdays triggers the homework digest. Both publish to the Pub/Sub topic.' },
   { id: 'pubsub',        label: 'Pub/Sub',          sublabel: 'GCP Message Bus',      icon: '📨', color: '#0369a1', bg: '#e0f2fe', x: 35,  y: 22, description: 'Google Cloud Pub/Sub decouples the scheduler from the poller. Push subscription with OIDC token auth. Messages carry a trigger type: "scheduled" for normal polls, "digest" for the 3pm homework summary.' },
-  { id: 'secretmanager', label: 'Secret Manager',   sublabel: 'GCP',                  icon: '🔐', color: '#b45309', bg: '#fef3c7', x: 80,  y: 22, description: 'Stores all credentials: ClassCharts passwords, Google OAuth keys, NextAuth secret, Pushover keys, Anthropic API key. Both the poller and frontend pull secrets at startup.' },
-  { id: 'poller',        label: 'Poller',            sublabel: 'Cloud Run',            icon: '🔄', color: '#1d4ed8', bg: '#dbeafe', x: 35,  y: 44, description: 'Node.js service on Cloud Run. Logs into ClassCharts via TES SSO, diffs state against Firestore, sends Pushover notifications, archives announcements, downloads attachments to GCS, creates Google Calendar events and Google Tasks via Claude analysis. Writes a heartbeat to Firestore after every poll for the status page.' },
+  { id: 'secretmanager', label: 'Secret Manager',   sublabel: 'GCP',                  icon: '🔐', color: '#b45309', bg: '#fef3c7', x: 80,  y: 22, description: 'Stores all credentials: ClassCharts passwords, Google OAuth keys, NextAuth secret, Anthropic API key. Both the poller and frontend pull secrets at startup. FCM tokens are stored per-user in GCS user-prefs.json instead.' },
+  { id: 'poller',        label: 'Poller',            sublabel: 'Cloud Run',            icon: '🔄', color: '#1d4ed8', bg: '#dbeafe', x: 35,  y: 44, description: 'Node.js service on Cloud Run. Logs into ClassCharts via TES SSO, diffs state against Firestore, sends push notifications via Firebase Cloud Messaging, archives announcements, downloads attachments to GCS, creates Google Calendar events and Google Tasks via Claude analysis. Writes a heartbeat to Firestore after every poll for the status page.' },
   { id: 'claude',        label: 'Claude API',        sublabel: 'Anthropic',            icon: '🤖', color: '#7c3aed', bg: '#ede9fe', x: 10,  y: 62, description: 'Claude (claude-sonnet-4-6) analyses new announcements: extracting calendar events, summarising content, identifying required actions and consent items. Also summarises homework and behaviour points for notifications.' },
   { id: 'firestore',     label: 'Firestore',         sublabel: 'GCP NoSQL',            icon: '🗄️', color: '#0f766e', bg: '#ccfbf1', x: 60,  y: 44, description: 'Stores poll state per pupil (last seen IDs for activities, homework, announcements — retains 200 IDs to prevent re-notification after deploy gaps), archived announcements with AI summaries, attachment metadata, and poller heartbeat for the status page.' },
   { id: 'gcs',           label: 'Cloud Storage',     sublabel: 'GCP',                  icon: '📦', color: '#b45309', bg: '#fef3c7', x: 85,  y: 44, description: 'Stores downloaded attachment files (PDFs, Word docs converted via LibreOffice) at attachments/{studentId}/{announcementId}/{filename}. Also stores config: allowed-users.json and user-prefs.json.' },
-  { id: 'pushover',      label: 'Pushover',           sublabel: 'Notifications',        icon: '📱', color: '#dc2626', bg: '#fee2e2', x: 10,  y: 82, description: 'Delivers specific, actionable push notifications to parents. Each notification names the child and describes exactly what happened. Per-parent toggles control which events trigger notifications.' },
+  { id: 'fcm',           label: 'Firebase Messaging', sublabel: 'Push Notifications',   icon: '🔔', color: '#f59e0b', bg: '#fffbeb', x: 10,  y: 82, description: 'Firebase Cloud Messaging delivers push notifications directly to each parent\'s browser/PWA. FCM tokens are registered per-device from the Settings page and stored in GCS user-prefs. No third-party account required — runs entirely within the GCP/Firebase ecosystem.' },
   { id: 'gcal',          label: 'Google Calendar',   sublabel: 'Events',               icon: '📅', color: '#0369a1', bg: '#e0f2fe', x: 35,  y: 82, description: 'Claude extracts dates and events from school announcements and creates Google Calendar entries automatically. One calendar per pupil. Covers trips, parents evenings, deadlines and term dates. Event titles updated when homework status changes (📚 → ✅).' },
   { id: 'gtasks',        label: 'Google Tasks',       sublabel: 'Homework',             icon: '✅', color: '#16a34a', bg: '#dcfce7', x: 55,  y: 82, description: 'Each new homework item creates a Google Task with the due date. Task status updates automatically when ClassCharts reports completion or late submission. One task list per pupil, synced to Google Calendar.' },
-  { id: 'status',        label: 'Status',             sublabel: 'Health checks',        icon: '⚡', color: '#f59e0b', bg: '#fef3c7', x: 80,  y: 82, description: 'The /status page reads the poller heartbeat from Firestore. Shows last poll time, staleness (green <7m, amber <15m, red >15m), per-dependency health (ClassCharts, Firestore, Anthropic, Pushover), and recent error log. Rule: when a dependency causes an incident, a health check must be added here in the same PR.' },
+  { id: 'status',        label: 'Status',             sublabel: 'Health checks',        icon: '⚡', color: '#f59e0b', bg: '#fef3c7', x: 80,  y: 82, description: 'The /status page reads the poller heartbeat from Firestore. Shows last poll time, staleness (green <7m, amber <15m, red >15m), per-dependency health (ClassCharts, Firestore, Anthropic, FCM), and recent error log. Rule: when a dependency causes an incident, a health check must be added here in the same PR.' },
   { id: 'frontend',      label: 'Frontend',           sublabel: 'App Engine / Next.js', icon: '⚡', color: '#1d4ed8', bg: '#dbeafe', x: 65,  y: 70, description: 'Next.js app on Google App Engine at classcharts.funfairlabs.com. Per-student cards with live timetable + attendance (Day View), behaviour, homework, announcements and documents. Multi-student support with demo mode for previewing second-student layouts. Pull-to-refresh, PWA installable, dark mode.' },
   { id: 'browser',       label: 'You',                sublabel: 'Mobile PWA',           icon: '👁️', color: '#111111', bg: '#f4f4f4', x: 65,  y: 92, description: 'The dashboard you\'re looking at. Installable as a PWA from Settings. Per-student colour palettes, student switcher in hamburger menu, demo mode for second-student preview. Traffic light in footer shows poller health at a glance.' },
 ];
@@ -67,13 +67,13 @@ const FLOWS: FlowStep[] = [
   { from: 'scheduler',    to: 'pubsub',        label: '*/5 + 3pm',      detail: 'Publishes {"trigger":"scheduled"} every 5 mins and {"trigger":"digest"} at 3pm weekdays' },
   { from: 'pubsub',       to: 'poller',        label: 'HTTP push+OIDC', detail: 'Pub/Sub pushes to Cloud Run via HTTP POST with OIDC token. IAM binding re-granted after every deploy to prevent drop.' },
   { from: 'poller',       to: 'classcharts',   label: 'TES SSO + REST', detail: 'Manual TES handshake then ClassCharts API calls per pupil — activity, homework, announcements, attendance, detentions' },
-  { from: 'poller',       to: 'secretmanager', label: 'Read secrets',   detail: 'Reads ClassCharts credentials, Pushover keys, Google tokens, Anthropic key at startup' },
+  { from: 'poller',       to: 'secretmanager', label: 'Read secrets',   detail: 'Reads ClassCharts credentials, Google tokens, Anthropic key at startup' },
   { from: 'frontend',     to: 'secretmanager', label: 'Read secrets',   detail: 'Reads Google OAuth, NextAuth secret, ClassCharts credentials at deploy time via app.yaml' },
   { from: 'poller',       to: 'claude',        label: 'Analyse',        detail: 'Sends announcement text to Claude for summary, calendar event extraction, action detection, and homework/behaviour digest' },
   { from: 'poller',       to: 'firestore',     label: 'State + archive',detail: 'Reads last-seen IDs. Writes state (200-ID ring buffer for announcements). Archives full announcement JSON with AI summary.' },
   { from: 'poller',       to: 'firestore',     label: 'Heartbeat',      detail: 'After every poll writes {polledAt, pupils, dependencies, errors} to status/poller for the health dashboard' },
   { from: 'poller',       to: 'gcs',           label: 'Save files',     detail: 'Downloads attachments from ClassCharts, converts docx/pptx/xlsx to PDF via LibreOffice, saves to GCS' },
-  { from: 'poller',       to: 'pushover',      label: 'Notify',         detail: 'Named notifications per event type, filtered by per-parent preference toggles in user-prefs.json' },
+  { from: 'poller',       to: 'fcm',           label: 'Notify',         detail: 'Named push notifications per event type, filtered by per-parent toggles. FCM tokens fetched from user-prefs.json in GCS.' },
   { from: 'poller',       to: 'gcal',          label: 'Create events',  detail: 'Creates calendar entries from Claude-extracted dates. Updates event title emoji when homework status changes.' },
   { from: 'poller',       to: 'gtasks',        label: 'Homework tasks', detail: 'Creates a Google Task per homework item with due date. Updates task completion status when ClassCharts reports it.' },
   { from: 'browser',      to: 'frontend',      label: 'HTTPS / PWA',   detail: 'Google OAuth via NextAuth. All API routes server-side. PWA installable from Settings page.' },
@@ -306,7 +306,7 @@ export default function ArchitecturePage() {
             { cat: 'Backend',      items: ['Node.js', 'Express', 'Cloud Run', 'Pub/Sub + OIDC'] },
             { cat: 'Storage',      items: ['Firestore', 'Cloud Storage', 'Secret Manager'] },
             { cat: 'Intelligence', items: ['Claude claude-sonnet-4-6', 'Announcement analysis', 'Calendar extraction', 'Digest summarisation'] },
-            { cat: 'Integrations', items: ['ClassCharts + TES SSO', 'Google Calendar', 'Google Tasks', 'Google OAuth', 'Pushover'] },
+            { cat: 'Integrations', items: ['ClassCharts + TES SSO', 'Google Calendar', 'Google Tasks', 'Google OAuth', 'Firebase Cloud Messaging'] },
             { cat: 'Observability',items: ['Poller heartbeat', 'Dependency health', 'Traffic light footer', 'Error log'] },
           ].map(({ cat, items }) => (
             <div key={cat} className="card" style={styles.stackCard}>

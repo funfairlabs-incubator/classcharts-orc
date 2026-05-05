@@ -1,6 +1,10 @@
 import express from 'express';
+import { initializeApp, getApps } from 'firebase-admin/app';
 import { pollClassCharts } from './poller.js';
 import { sendHomeworkDigest } from './digest.js';
+
+// Initialise Firebase Admin once at startup (uses Application Default Credentials on GCP)
+if (!getApps().length) initializeApp();
 
 const app = express();
 app.use(express.json());
@@ -35,7 +39,7 @@ app.post('/', async (req, res) => {
       await db.collection('status').doc('poller').set({
         polledAt: new Date().toISOString(),
         pupils: [],
-        dependencies: { classcharts: 'error', firestore: 'ok', pubsub: 'ok', anthropic: 'ok', pushover: 'ok', gcs: 'ok', gcal: 'ok', gtasks: 'ok', secretmanager: 'ok' },
+        dependencies: { classcharts: 'error', firestore: 'ok', pubsub: 'ok', anthropic: 'ok', fcm: 'ok', gcs: 'ok', gcal: 'ok', gtasks: 'ok', secretmanager: 'ok' },
         errors: [`CRASH: ${String(err)}`],
         updatedAt: new Date().toISOString(),
       });

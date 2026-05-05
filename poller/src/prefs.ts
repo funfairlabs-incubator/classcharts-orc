@@ -45,6 +45,20 @@ export async function savePrefsForEmail(prefs: UserNotificationPrefs): Promise<v
   await saveAllPrefs(config);
 }
 
+// Get all FCM tokens for users that have a given toggle enabled
+export async function getEnabledFcmTokens(
+  toggle: keyof UserNotificationPrefs['notifications'],
+): Promise<string[]> {
+  const config = await getAllPrefs();
+  const tokens: string[] = [];
+  for (const pref of config.prefs) {
+    if (!pref.fcmTokens?.length) continue;
+    const notifs = pref.notifications ?? DEFAULT_PREFS;
+    if (notifs[toggle]) tokens.push(...pref.fcmTokens);
+  }
+  return [...new Set(tokens)];
+}
+
 // Get all Pushover keys that have a given toggle enabled
 // Returns array of { userKey, email } for everyone who wants this notification
 export async function getEnabledKeys(
