@@ -71,10 +71,12 @@ export async function POST() {
   const pushoverToken = process.env.PUSHOVER_API_TOKEN;
   const pushoverKey = process.env.PUSHOVER_USER_KEY;
   let pushoverEnabled = process.env.PUSHOVER_ENABLED !== 'false';
+  let fcmEnabled = false;
   try {
     const [prefsContent] = await storage.bucket(process.env.GCS_BUCKET!).file('config/user-prefs.json').download();
     const prefsConfig = JSON.parse(prefsContent.toString());
     if (typeof prefsConfig.pushoverEnabled === 'boolean') pushoverEnabled = prefsConfig.pushoverEnabled;
+    if (typeof prefsConfig.fcmEnabled === 'boolean') fcmEnabled = prefsConfig.fcmEnabled;
   } catch { /* use env var fallback */ }
 
   if (pushoverEnabled && pushoverToken && pushoverKey) {
@@ -103,7 +105,7 @@ export async function POST() {
   // FCM REST API requires the Firebase project ID, not the GCP project ID
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? process.env.GCP_PROJECT_ID!;
 
-  if (fcmTokens.length > 0) {
+  if (fcmEnabled && fcmTokens.length > 0) {
     const sends = await Promise.allSettled(
       fcmTokens.map(token =>
         sendFcmViaRest(token, '🧪 Test — ClassCharts (FCM)', `FCM channel working ✓\n${time}`, projectId)
@@ -116,7 +118,7 @@ export async function POST() {
       results.fcm = `${failed.length}/${fcmTokens.length} failed: ${(failed[0] as PromiseRejectedResult).reason}`;
     }
   } else {
-    results.fcm = 'no tokens registered — visit /settings and enable notifications first';
+    results.fcm = fcmEnabled ? 'no tokens registered — visit /settings and enable notifications first' : 'disabled';
   }
 
   const anyOk = Object.values(results).some(v => v === 'ok' || v.startsWith('ok'));

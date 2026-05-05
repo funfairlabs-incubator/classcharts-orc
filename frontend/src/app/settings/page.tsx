@@ -53,7 +53,8 @@ export default function SettingsPage() {
   const [testing, setTesting] = useState<'idle'|'sending'|'ok'|'error'>('idle');
   const [notifStatus, setNotifStatus] = useState<'unknown'|'granted'|'denied'|'registering'|'registered'|'error'>('unknown');
   const [pushoverEnabled, setPushoverEnabled] = useState<boolean | null>(null);
-  const [pushoverSaving, setPushoverSaving] = useState(false);
+  const [fcmEnabled, setFcmEnabled] = useState<boolean | null>(null);
+  const [channelSaving, setChannelSaving] = useState<'pushover'|'fcm'|null>(null);
   const isAdmin = session?.user?.email?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN_EMAIL?.toLowerCase();
   const { pupils } = usePupil();
   const [palettes, setPalettes] = useState<Record<number, ReturnType<typeof paletteFromHex>>>({});
@@ -106,10 +107,13 @@ export default function SettingsPage() {
         setDemoColourState(parsed.color);
       }
     } catch { /* ignore */ }
-    // Admin: fetch pushover toggle state
-    fetch('/api/settings/pushover')
+    // Admin: fetch channel toggle states
+    fetch('/api/settings/channels')
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.pushoverEnabled !== undefined) setPushoverEnabled(d.pushoverEnabled); })
+      .then(d => {
+        if (d?.pushoverEnabled !== undefined) setPushoverEnabled(d.pushoverEnabled);
+        if (d?.fcmEnabled !== undefined) setFcmEnabled(d.fcmEnabled);
+      })
       .catch(() => {});
 
     // Check if this device already has a token registered
@@ -176,19 +180,21 @@ export default function SettingsPage() {
     }
   }
 
-  async function togglePushover(enabled: boolean) {
-    setPushoverSaving(true);
+  async function toggleChannel(channel: 'pushover' | 'fcm', enabled: boolean) {
+    setChannelSaving(channel);
     try {
-      await fetch('/api/settings/pushover', {
+      const res = await fetch('/api/settings/channels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pushoverEnabled: enabled }),
+        body: JSON.stringify(channel === 'pushover' ? { pushoverEnabled: enabled } : { fcmEnabled: enabled }),
       });
-      setPushoverEnabled(enabled);
+      const data = await res.json();
+      if (data.pushoverEnabled !== undefined) setPushoverEnabled(data.pushoverEnabled);
+      if (data.fcmEnabled !== undefined) setFcmEnabled(data.fcmEnabled);
     } catch (err) {
-      console.error('Failed to update Pushover setting:', err);
+      console.error(`Failed to update ${channel} setting:`, err);
     } finally {
-      setPushoverSaving(false);
+      setChannelSaving(null);
     }
   }
 
@@ -407,31 +413,54 @@ export default function SettingsPage() {
       )}
 
       {/* System — admin only */}
-      {pushoverEnabled !== null && (
+      {(pushoverEnabled !== null || fcmEnabled !== null) && (
         <div className="card" style={styles.section}>
-          <h2 style={styles.sectionTitle}>System</h2>
+          <h2 style={styles.sectionTitle}>Notification Channels</h2>
           <p style={styles.sectionDesc}>Admin controls. Changes take effect on the next poll.</p>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingTop: 8 }}>
+
+          {/* Pushover */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingTop: 12 }}>
             <div>
-              <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>Pushover notifications</p>
+              <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>Pushover</p>
               <p style={{ fontSize: 12, color: 'var(--text-2)' }}>
-                {pushoverEnabled
-                  ? 'On — parallel run active, both Pushover and FCM fire'
-                  : 'Off — FCM only, Pushover disabled'}
+                {pushoverEnabled ? 'On — rich notifications via Pushover' : 'Off'}
               </p>
             </div>
             <button
               style={{
                 padding: '10px 18px', borderRadius: 6, border: '1px solid var(--border)',
-                fontSize: 13, fontWeight: 600, cursor: pushoverSaving ? 'default' : 'pointer',
+                fontSize: 13, fontWeight: 600, cursor: channelSaving === 'pushover' ? 'default' : 'pointer',
                 background: pushoverEnabled ? 'var(--positive-bg)' : 'var(--surface-2)',
                 color: pushoverEnabled ? 'var(--positive)' : 'var(--text-2)',
                 flexShrink: 0, minWidth: 80,
               }}
-              onClick={() => togglePushover(!pushoverEnabled)}
-              disabled={pushoverSaving}
+              onClick={() => toggleChannel('pushover', !pushoverEnabled)}
+              disabled={channelSaving === 'pushover'}
             >
-              {pushoverSaving ? '…' : pushoverEnabled ? 'On' : 'Off'}
+              {channelSaving === 'pushover' ? '…' : pushoverEnabled ? 'On' : 'Off'}
+            </button>
+          </div>
+
+          {/* FCM */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingTop: 16, marginTop: 12, borderTop: '1px solid var(--border)' }}>
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>Firebase Cloud Messaging</p>
+              <p style={{ fontSize: 12, color: 'var(--text-2)' }}>
+                {fcmEnabled ? 'On — web push to registered devices' : 'Off — enable once devices are registered'}
+              </p>
+            </div>
+            <button
+              style={{
+                padding: '10px 18px', borderRadius: 6, border: '1px solid var(--border)',
+                fontSize: 13, fontWeight: 600, cursor: channelSaving === 'fcm' ? 'default' : 'pointer',
+                background: fcmEnabled ? 'var(--positive-bg)' : 'var(--surface-2)',
+                color: fcmEnabled ? 'var(--positive)' : 'var(--text-2)',
+                flexShrink: 0, minWidth: 80,
+              }}
+              onClick={() => toggleChannel('fcm', !fcmEnabled)}
+              disabled={channelSaving === 'fcm'}
+            >
+              {channelSaving === 'fcm' ? '…' : fcmEnabled ? 'On' : 'Off'}
             </button>
           </div>
         </div>

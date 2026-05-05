@@ -202,7 +202,8 @@ export interface UserNotificationPrefs {
 
 export interface UserPrefsConfig {
   prefs: UserNotificationPrefs[];
-  pushoverEnabled?: boolean; // global toggle — true during parallel run, false after FCM cutover
+  pushoverEnabled?: boolean; // default true
+  fcmEnabled?: boolean;      // default false — enable once FCM is validated
 }
 
 // ── Archived announcement (Firestore) ─────────────────────────

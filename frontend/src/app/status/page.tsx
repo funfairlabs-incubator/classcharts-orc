@@ -73,7 +73,7 @@ const DEPENDENCIES: Record<string, DependencyInfo> = {
   fcm: {
     label: 'Firebase Messaging',
     what: 'Push notifications to parents for new homework, behaviour, announcements, attendance alerts',
-    why: 'Push notifications to parents via Firebase Cloud Messaging. Degrades gracefully — data is still archived to Firestore if FCM fails. During parallel-run week Pushover also fires; set PUSHOVER_ENABLED=false in Secret Manager to cut over to FCM-only.',
+    why: 'Push notifications via Firebase Cloud Messaging. Both Pushover and FCM can run in parallel; each channel toggled independently from Settings → Notification Channels (admin only). Defaults: Pushover on, FCM off.',
     when: 'Called for each new event detected by the poller.',
     with: 'Firebase Admin SDK messaging.send(). FCM tokens registered per-device: browser registers firebase-messaging-sw.js, calls getToken() with VAPID key, token stored in GCS user-prefs.json. If red: check VAPID key in Secret Manager, check Firebase Console → Cloud Messaging, verify users have visited /settings and enabled notifications.',
     degradesGracefully: true,

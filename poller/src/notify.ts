@@ -32,6 +32,7 @@ export async function sendNotification(
   const pushoverEnabled = config.pushoverEnabled !== undefined
     ? config.pushoverEnabled
     : process.env.PUSHOVER_ENABLED !== 'false';
+  const fcmEnabled = config.fcmEnabled ?? false; // default off until explicitly enabled
 
   const tasks: Promise<void>[] = [];
 
@@ -43,7 +44,7 @@ export async function sendNotification(
   }
 
   // ── FCM ───────────────────────────────────────────────────────
-  if (fcmTokens.length > 0) {
+  if (fcmEnabled && fcmTokens.length > 0) {
     tasks.push(sendFcm(fcmTokens, msg));
   }
 
