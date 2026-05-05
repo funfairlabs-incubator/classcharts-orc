@@ -27,6 +27,22 @@ async function getFcmTokensForEmail(email: string): Promise<string[]> {
 }
 
 export async function POST() {
+  // Wrap entire handler so any uncaught error is written to GCS for diagnosis
+  try {
+    return await handlePost();
+  } catch (err) {
+    const msg = `${new Date().toISOString()}
+${String(err)}
+${(err as any)?.stack ?? ''}`;
+    try {
+      await storage.bucket(process.env.GCS_BUCKET!).file('config/test-notification-error.txt').save(msg, { contentType: 'text/plain' });
+    } catch { /* ignore diagnostic write failure */ }
+    console.error('test-notification crash:', err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+}
+
+async function handlePost() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 

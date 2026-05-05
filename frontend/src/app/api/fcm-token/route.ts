@@ -24,6 +24,20 @@ async function savePrefs(config: UserPrefsConfig): Promise<void> {
   );
 }
 
+// GET /api/fcm-token — returns { registered: boolean } for the signed-in user
+export async function GET() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const email = session.user.email.toLowerCase();
+  const config = await loadPrefs();
+  const prefs = config.prefs.find(p => p.email.toLowerCase() === email);
+  const registered = (prefs?.fcmTokens?.length ?? 0) > 0;
+  return NextResponse.json({ registered });
+}
+
 // POST /api/fcm-token  { token: string }
 // Registers an FCM token for the signed-in user. Idempotent.
 export async function POST(req: NextRequest) {
