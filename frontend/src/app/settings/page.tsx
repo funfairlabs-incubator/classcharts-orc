@@ -112,6 +112,12 @@ export default function SettingsPage() {
       .then(d => { if (d?.pushoverEnabled !== undefined) setPushoverEnabled(d.pushoverEnabled); })
       .catch(() => {});
 
+    // Check if this device already has a token registered
+    fetch('/api/fcm-token')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.registered) setNotifStatus('registered'); })
+      .catch(() => {});
+
     fetch('/api/settings/prefs')
       .then(r => r.json())
       .then(d => {
