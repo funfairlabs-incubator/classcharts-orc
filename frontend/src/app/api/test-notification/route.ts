@@ -37,7 +37,13 @@ export async function POST() {
   // ── Pushover ──────────────────────────────────────────────
   const pushoverToken = process.env.PUSHOVER_API_TOKEN;
   const pushoverKey = process.env.PUSHOVER_USER_KEY;
-  const pushoverEnabled = process.env.PUSHOVER_ENABLED !== 'false';
+  // Check GCS config first (set via /settings), fall back to env var
+  let pushoverEnabled = process.env.PUSHOVER_ENABLED !== 'false';
+  try {
+    const [prefsContent] = await storage.bucket(process.env.GCS_BUCKET!).file('config/user-prefs.json').download();
+    const prefsConfig = JSON.parse(prefsContent.toString());
+    if (typeof prefsConfig.pushoverEnabled === 'boolean') pushoverEnabled = prefsConfig.pushoverEnabled;
+  } catch { /* use env var fallback */ }
 
   if (pushoverEnabled && pushoverToken && pushoverKey) {
     try {
