@@ -6,9 +6,6 @@ import { initializeApp, getApps } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 import type { UserPrefsConfig } from '@classcharts/shared';
 
-// ── Firebase Admin init ───────────────────────────────────────
-if (!getApps().length) initializeApp();
-
 // ── GCS prefs ─────────────────────────────────────────────────
 const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
 
@@ -80,6 +77,18 @@ async function handlePost() {
     }
   } else {
     results.pushover = 'disabled';
+  }
+
+  // ── Firebase Admin init (deferred so errors are catchable) ──
+  if (!getApps().length) {
+    try {
+      initializeApp();
+    } catch (initErr) {
+      console.error('Firebase Admin initializeApp failed:', initErr);
+      results.fcm = `error: Firebase Admin init failed — ${String(initErr)}`;
+      const anyOk = Object.values(results).some(v => v === 'ok' || v.startsWith('ok'));
+      return NextResponse.json({ ok: anyOk, results }, { status: anyOk ? 200 : 500 });
+    }
   }
 
   // ── FCM ───────────────────────────────────────────────────
