@@ -39,7 +39,7 @@ A parent-facing dashboard for ClassCharts school data, with real-time polling, p
 2. **Cloud Run Poller** wakes, logs into ClassCharts via parent credentials
 3. Poller checks for new: announcements, homework, behaviour points, attendance
 4. New items are archived to **Firestore** + attachments to **GCS**
-5. **Pushover** notifications sent immediately for new items
+5. **Firebase Cloud Messaging (FCM)** push notifications sent immediately for new items
 6. **Google Calendar** events created for homework (issue date) and announcements
 7. **Google Tasks** created for new homework
 8. **Frontend** (Next.js on App Engine) reads from Firestore + GCS, served at custom domain
@@ -94,7 +94,8 @@ Cloud Run container (node:20-alpine + LibreOffice)
 ├── src/calendar.ts    — Google Calendar event management
 ├── src/tasks.ts       — Google Tasks management
 ├── src/claude.ts      — Anthropic API for announcement summarisation
-├── src/formatter.ts   — Pushover message formatting
+├── src/formatter.ts   — notification message formatting
+├── src/notify.ts      — unified FCM + Pushover dispatch (parallel-run); FCM-only post-cutover
 ├── src/state.ts       — Firestore poll state (per student)
 └── src/index.ts       — Express HTTP server (receives Pub/Sub push)
 ```
@@ -150,6 +151,7 @@ App Engine (nodejs22, F1 instance)
 | Firestore | Poll state + archived announcements |
 | GCS | Attachment storage (`classcharts-attachments`) |
 | Secret Manager | All credentials |
+| Firebase Cloud Messaging | Push notifications to parent PWAs |
 
 ### Service Accounts
 
@@ -165,6 +167,25 @@ App Engine (nodejs22, F1 instance)
 - **No `getSignedUrl` on App Engine SA** — attachment proxy streams directly from GCS instead.
 - **`NEXTAUTH_URL` must be in generated `app.yaml`** — App Engine does not read `.env`.
 - **GitHub Actions cannot stream Cloud Build logs** — the deploy still succeeds; add `roles/logging.viewer` to `github-actions` SA to fix.
+
+---
+
+## Pushover → FCM Transition
+
+Push notifications are migrating from Pushover to Firebase Cloud Messaging (FCM). During the transition both channels run in parallel.
+
+**To add new secrets (one-time setup):**
+1. Get Firebase config from [Firebase Console → Project Settings → General → Your apps](https://console.firebase.google.com)
+2. Get VAPID key from Firebase Console → Cloud Messaging → Web Push certificates → Generate key pair
+3. Add values to your local `.env` file
+4. Run `cd infra && ./load-secrets.sh ../.env` to push to Secret Manager
+5. Merge the PR — GitHub Actions deploys both poller and frontend
+
+**FCM token registration:**  
+Each parent visits `/settings` and taps **Enable notifications on this device**. This registers an FCM token stored per-user in `config/user-prefs.json` in GCS.
+
+**Cutover:**  
+After a week of parallel running, set `PUSHOVER_ENABLED=false` in Secret Manager (no redeploy needed — poller reads it at runtime). Then remove `PUSHOVER_API_TOKEN` and `PUSHOVER_USER_KEY` secrets on the next PR.
 
 ---
 
@@ -198,8 +219,16 @@ cd poller && npm run dev
 | `NEXTAUTH_URL` | Frontend |
 | `GCAL_REFRESH_TOKEN` | Poller (Calendar + Tasks) |
 | `ANTHROPIC_API_KEY` | Poller (announcement AI) |
-| `PUSHOVER_API_TOKEN` | Poller |
-| `PUSHOVER_USER_KEY` | Poller |
+| `PUSHOVER_API_TOKEN` | Poller (parallel-run only — remove after FCM cutover) |
+| `PUSHOVER_USER_KEY` | Poller (parallel-run only — remove after FCM cutover) |
+| `PUSHOVER_ENABLED` | Poller (`true` during parallel run, `false` to cut over to FCM-only) |
+| `FIREBASE_API_KEY` | Frontend (NEXT_PUBLIC) |
+| `FIREBASE_AUTH_DOMAIN` | Frontend (NEXT_PUBLIC) |
+| `FIREBASE_PROJECT_ID` | Frontend (NEXT_PUBLIC) |
+| `FIREBASE_STORAGE_BUCKET` | Frontend (NEXT_PUBLIC) |
+| `FIREBASE_MESSAGING_SENDER_ID` | Frontend (NEXT_PUBLIC) |
+| `FIREBASE_APP_ID` | Frontend (NEXT_PUBLIC) |
+| `FIREBASE_VAPID_KEY` | Frontend — FCM web push certificate key pair |
 | `ADMIN_EMAIL` | Frontend |
 | `WEBHOOK_SECRET` | Poller |
 
