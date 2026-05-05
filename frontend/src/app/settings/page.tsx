@@ -52,6 +52,9 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState<'idle'|'sending'|'ok'|'error'>('idle');
   const [notifStatus, setNotifStatus] = useState<'unknown'|'granted'|'denied'|'registering'|'registered'|'error'>('unknown');
+  const [pushoverEnabled, setPushoverEnabled] = useState<boolean | null>(null);
+  const [pushoverSaving, setPushoverSaving] = useState(false);
+  const isAdmin = session?.user?.email?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN_EMAIL?.toLowerCase();
   const { pupils } = usePupil();
   const [palettes, setPalettes] = useState<Record<number, ReturnType<typeof paletteFromHex>>>({});
   const [themeColour, setThemeColour] = useState('#f97316');
@@ -103,6 +106,12 @@ export default function SettingsPage() {
         setDemoColourState(parsed.color);
       }
     } catch { /* ignore */ }
+    // Admin: fetch pushover toggle state
+    fetch('/api/settings/pushover')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.pushoverEnabled !== undefined) setPushoverEnabled(d.pushoverEnabled); })
+      .catch(() => {});
+
     fetch('/api/settings/prefs')
       .then(r => r.json())
       .then(d => {
@@ -158,6 +167,22 @@ export default function SettingsPage() {
     } catch (err) {
       console.error('FCM registration failed:', err);
       setNotifStatus('error');
+    }
+  }
+
+  async function togglePushover(enabled: boolean) {
+    setPushoverSaving(true);
+    try {
+      await fetch('/api/settings/pushover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pushoverEnabled: enabled }),
+      });
+      setPushoverEnabled(enabled);
+    } catch (err) {
+      console.error('Failed to update Pushover setting:', err);
+    } finally {
+      setPushoverSaving(false);
     }
   }
 
@@ -371,6 +396,37 @@ export default function SettingsPage() {
                 />
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* System — admin only */}
+      {pushoverEnabled !== null && (
+        <div className="card" style={styles.section}>
+          <h2 style={styles.sectionTitle}>System</h2>
+          <p style={styles.sectionDesc}>Admin controls. Changes take effect on the next poll.</p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingTop: 8 }}>
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>Pushover notifications</p>
+              <p style={{ fontSize: 12, color: 'var(--text-2)' }}>
+                {pushoverEnabled
+                  ? 'On — parallel run active, both Pushover and FCM fire'
+                  : 'Off — FCM only, Pushover disabled'}
+              </p>
+            </div>
+            <button
+              style={{
+                padding: '10px 18px', borderRadius: 6, border: '1px solid var(--border)',
+                fontSize: 13, fontWeight: 600, cursor: pushoverSaving ? 'default' : 'pointer',
+                background: pushoverEnabled ? 'var(--positive-bg)' : 'var(--surface-2)',
+                color: pushoverEnabled ? 'var(--positive)' : 'var(--text-2)',
+                flexShrink: 0, minWidth: 80,
+              }}
+              onClick={() => togglePushover(!pushoverEnabled)}
+              disabled={pushoverSaving}
+            >
+              {pushoverSaving ? '…' : pushoverEnabled ? 'On' : 'Off'}
+            </button>
           </div>
         </div>
       )}

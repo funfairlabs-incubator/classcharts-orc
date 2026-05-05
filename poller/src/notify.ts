@@ -9,6 +9,7 @@
 import { getMessaging } from 'firebase-admin/messaging';
 import { sendPushoverToKeys } from './pushover.js';
 import type { PushoverMessage } from './pushover.js';
+import { getAllPrefs } from './prefs.js';
 
 export interface NotifyMessage {
   title: string;
@@ -26,7 +27,11 @@ export async function sendNotification(
   fcmTokens: string[],
   msg: NotifyMessage,
 ): Promise<void> {
-  const pushoverEnabled = process.env.PUSHOVER_ENABLED !== 'false';
+  // GCS config takes precedence over env var — allows toggling from the Settings UI
+  const config = await getAllPrefs();
+  const pushoverEnabled = config.pushoverEnabled !== undefined
+    ? config.pushoverEnabled
+    : process.env.PUSHOVER_ENABLED !== 'false';
 
   const tasks: Promise<void>[] = [];
 
