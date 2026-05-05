@@ -100,7 +100,8 @@ export async function POST() {
 
   // ── FCM via REST API (no firebase-admin SDK needed) ───────
   const fcmTokens = await getFcmTokensForEmail(email);
-  const projectId = process.env.GCP_PROJECT_ID!;
+  // FCM REST API requires the Firebase project ID, not the GCP project ID
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? process.env.GCP_PROJECT_ID!;
 
   if (fcmTokens.length > 0) {
     const sends = await Promise.allSettled(
