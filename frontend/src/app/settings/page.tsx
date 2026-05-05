@@ -1,6 +1,6 @@
 'use client';
 import { useSession } from 'next-auth/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePupil } from '@/lib/usePupil';
 import { getFirebaseMessaging } from '@/lib/firebase';
 import { getToken } from 'firebase/messaging';
@@ -29,27 +29,19 @@ const DEFAULT_PREFS: NotificationPrefs = {
   behaviour: true, detentions: true, attendance: true, announcements: true,
 };
 
-const THEME_COLOURS = [
-  { label: 'Orange',  color: '#f97316' },
-  { label: 'Violet',  color: '#6366f1' },
-  { label: 'Blue',    color: '#1d4ed8' },
-  { label: 'Green',   color: '#15803d' },
-  { label: 'Rose',    color: '#be185d' },
-  { label: 'Teal',    color: '#0f766e' },
-  { label: 'Slate',   color: '#475569' },
-  { label: 'Black',   color: '#0a0a0a' },
-];
-
-const PALETTE_PRESETS = [
-  { label: 'Blue',    color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
-  { label: 'Amber',   color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
-  { label: 'Green',   color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' },
-  { label: 'Violet',  color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
-  { label: 'Rose',    color: '#be185d', bg: '#fdf2f8', border: '#fbcfe8' },
-  { label: 'Teal',    color: '#0f766e', bg: '#f0fdfa', border: '#99f6e4' },
-  { label: 'Orange',  color: '#c2410c', bg: '#fff7ed', border: '#fed7aa' },
-  { label: 'Slate',   color: '#475569', bg: '#f8fafc', border: '#cbd5e1' },
-];
+/** Derive a full palette from any hex colour for card bg/border tints. */
+function paletteFromHex(hex: string): { color: string; bg: string; border: string; label: string } {
+  // Parse to r,g,b
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  // bg: mix 8% colour into white; border: mix 25% colour into white
+  const mix = (c: number, pct: number) => Math.round(255 * (1 - pct) + c * pct);
+  const toHex = (n: number) => n.toString(16).padStart(2, '0');
+  const bg = `#${toHex(mix(r, 0.08))}${toHex(mix(g, 0.08))}${toHex(mix(b, 0.08))}`;
+  const border = `#${toHex(mix(r, 0.25))}${toHex(mix(g, 0.25))}${toHex(mix(b, 0.25))}`;
+  return { color: hex, bg, border, label: hex };
+}
 
 export default function SettingsPage() {
   const { data: session } = useSession();
@@ -61,19 +53,15 @@ export default function SettingsPage() {
   const [testing, setTesting] = useState<'idle'|'sending'|'ok'|'error'>('idle');
   const [notifStatus, setNotifStatus] = useState<'unknown'|'granted'|'denied'|'registering'|'registered'|'error'>('unknown');
   const { pupils } = usePupil();
-  const [palettes, setPalettes] = useState<Record<number, typeof PALETTE_PRESETS[0]>>({});
+  const [palettes, setPalettes] = useState<Record<number, ReturnType<typeof paletteFromHex>>>({});
   const [themeColour, setThemeColour] = useState('#f97316');
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
+  const [demoColour, setDemoColourState] = useState('#15803d');
 
   useEffect(() => {
-    // Check notification permission state
-    if ('Notification' in window) {
-      setNotifStatus(Notification.permission === 'granted' ? 'granted' : Notification.permission === 'denied' ? 'denied' : 'unknown');
-    }
-    // Check if already installed
     if (window.matchMedia('(display-mode: standalone)').matches) setIsInstalled(true);
-    // Capture install prompt
     const handler = (e: Event) => { e.preventDefault(); setInstallPrompt(e); };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
@@ -86,13 +74,19 @@ export default function SettingsPage() {
     if (outcome === 'accepted') setIsInstalled(true);
     setInstallPrompt(null);
   }
-  const [demoMode, setDemoMode] = useState(false);
-  const [demoPalette, setDemoPalette] = useState(PALETTE_PRESETS[2]); // Green default
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem('pupilPalettes');
-      if (saved) setPalettes(JSON.parse(saved));
+      if (saved) {
+        // Migrate old preset objects (have .label like 'Blue') to paletteFromHex shape
+        const parsed = JSON.parse(saved) as Record<number, { color: string }>;
+        const migrated: Record<number, ReturnType<typeof paletteFromHex>> = {};
+        for (const [id, p] of Object.entries(parsed)) {
+          migrated[Number(id)] = paletteFromHex(p.color);
+        }
+        setPalettes(migrated);
+      }
     } catch { /* ignore */ }
     try {
       const tc = localStorage.getItem('themeColour');
@@ -104,7 +98,10 @@ export default function SettingsPage() {
     } catch { /* ignore */ }
     try {
       const dp = localStorage.getItem('demoPalette');
-      if (dp) setDemoPalette(JSON.parse(dp));
+      if (dp) {
+        const parsed = JSON.parse(dp) as { color: string };
+        setDemoColourState(parsed.color);
+      }
     } catch { /* ignore */ }
     fetch('/api/settings/prefs')
       .then(r => r.json())
@@ -150,7 +147,6 @@ export default function SettingsPage() {
   }
 
   function applyThemeColour(colour: string) {
-    // Update the meta theme-color tag for PWA status bar
     let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement;
     if (!meta) {
       meta = document.createElement('meta');
@@ -158,7 +154,6 @@ export default function SettingsPage() {
       document.head.appendChild(meta);
     }
     meta.content = colour;
-    // Also update the nav bar background via CSS variable
     document.documentElement.style.setProperty('--theme-colour', colour);
   }
 
@@ -169,20 +164,22 @@ export default function SettingsPage() {
     window.dispatchEvent(new CustomEvent('demoModeChange', { detail: next }));
   }
 
-  function setDemoColour(preset: typeof PALETTE_PRESETS[0]) {
-    setDemoPalette(preset);
-    try { localStorage.setItem('demoPalette', JSON.stringify(preset)); } catch { /* ignore */ }
-    window.dispatchEvent(new CustomEvent('demoPaletteChange', { detail: preset }));
+  function handleDemoColour(hex: string) {
+    setDemoColourState(hex);
+    const palette = paletteFromHex(hex);
+    try { localStorage.setItem('demoPalette', JSON.stringify(palette)); } catch { /* ignore */ }
+    window.dispatchEvent(new CustomEvent('demoPaletteChange', { detail: palette }));
   }
 
-  function setTheme(colour: string) {
-    setThemeColour(colour);
-    applyThemeColour(colour);
-    try { localStorage.setItem('themeColour', colour); } catch { /* ignore */ }
+  function handleTheme(hex: string) {
+    setThemeColour(hex);
+    applyThemeColour(hex);
+    try { localStorage.setItem('themeColour', hex); } catch { /* ignore */ }
   }
 
-  function setPupilPalette(pupilId: number, preset: typeof PALETTE_PRESETS[0]) {
-    const updated = { ...palettes, [pupilId]: preset };
+  function handlePupilColour(pupilId: number, hex: string) {
+    const palette = paletteFromHex(hex);
+    const updated = { ...palettes, [pupilId]: palette };
     setPalettes(updated);
     try { localStorage.setItem('pupilPalettes', JSON.stringify(updated)); } catch { /* ignore */ }
   }
@@ -281,12 +278,12 @@ export default function SettingsPage() {
 
       {pupils.length > 0 && (
         <div className="card" style={styles.section}>
-          <h2 style={styles.sectionTitle}>Card Colours</h2>
-          <p style={styles.sectionDesc}>Choose an accent colour for each child's card on the dashboard.</p>
+          <h2 style={styles.sectionTitle}>Colours</h2>
+          <p style={styles.sectionDesc}>Customise the accent colours for the app and each student's card.</p>
 
           {/* Install app */}
-          <div style={{ marginBottom: 24, padding: '12px 16px', background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
-            <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Install app</p>
+          <div style={styles.subSection}>
+            <p style={styles.subLabel}>Install app</p>
             {isInstalled ? (
               <p style={{ fontSize: 12, color: 'var(--positive)' }}>✓ App is installed</p>
             ) : installPrompt ? (
@@ -306,17 +303,39 @@ export default function SettingsPage() {
             )}
           </div>
 
-          {/* Demo mode */}
-          <div style={{ marginBottom: 24, padding: '12px 16px', background: demoMode ? 'var(--surface-2)' : 'transparent', borderRadius: 8, border: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Demo: second student</p>
-                <p style={{ fontSize: 12, color: 'var(--text-2)' }}>Shows a preview card with example data — useful for testing layouts before a new child joins.</p>
+          {/* PWA theme colour */}
+          <div style={styles.subSection}>
+            <p style={styles.subLabel}>PWA theme colour</p>
+            <p style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 12 }}>Sets the status bar and header accent colour.</p>
+            <ColourPickerRow
+              colour={themeColour}
+              onChange={handleTheme}
+            />
+          </div>
+
+          {/* Per-pupil card colours */}
+          {pupils.map(pupil => {
+            const currentColour = palettes[pupil.id]?.color ?? '#1d4ed8';
+            return (
+              <div key={pupil.id} style={styles.subSection}>
+                <p style={styles.subLabel}>{pupil.firstName}</p>
+                <p style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 12 }}>Accent colour for {pupil.firstName}'s dashboard card.</p>
+                <ColourPickerRow
+                  colour={currentColour}
+                  onChange={hex => handlePupilColour(pupil.id, hex)}
+                />
               </div>
+            );
+          })}
+
+          {/* Demo mode */}
+          <div style={{ ...styles.subSection, marginBottom: 0, paddingBottom: 0, borderBottom: 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <p style={styles.subLabel}>Demo student</p>
               <button onClick={toggleDemoMode} style={{
                 width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
                 background: demoMode ? 'var(--accent, #6366f1)' : 'var(--border)',
-                position: 'relative', flexShrink: 0, marginLeft: 16, transition: 'background 0.2s',
+                position: 'relative', flexShrink: 0, transition: 'background 0.2s',
               }}>
                 <span style={{
                   position: 'absolute', top: 3, left: demoMode ? 22 : 2,
@@ -325,67 +344,18 @@ export default function SettingsPage() {
                 }} />
               </button>
             </div>
-          {demoMode && (
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-              <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Demo student colour</p>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {PALETTE_PRESETS.map(preset => (
-                  <button key={preset.color} onClick={() => setDemoColour(preset)} title={preset.label} style={{
-                    width: 28, height: 28, borderRadius: '50%', background: preset.color,
-                    border: 'none', cursor: 'pointer',
-                    boxShadow: demoPalette.color === preset.color ? `0 0 0 2px var(--bg), 0 0 0 4px ${preset.color}` : 'none',
-                  }} />
-                ))}
-              </div>
-            </div>
-          )}
-          </div>
-
-          {/* Theme colour */}
-          <div style={{ marginBottom: 24 }}>
-            <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>App theme colour</p>
-            <p style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 12 }}>Sets the PWA status bar and header accent.</p>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {THEME_COLOURS.map(tc => (
-                <button key={tc.color} onClick={() => setTheme(tc.color)} title={tc.label} style={{
-                  width: 32, height: 32, borderRadius: '50%', background: tc.color, border: 'none', cursor: 'pointer',
-                  outline: themeColour === tc.color ? `3px solid ${tc.color}` : 'none',
-                  outlineOffset: 2,
-                  boxShadow: themeColour === tc.color ? '0 0 0 2px var(--bg), 0 0 0 4px ' + tc.color : 'none',
-                }} />
-              ))}
-            </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {pupils.map(pupil => {
-              const current = palettes[pupil.id] ?? PALETTE_PRESETS[0];
-              return (
-                <div key={pupil.id}>
-                  <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{pupil.firstName}</p>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {PALETTE_PRESETS.map(preset => (
-                      <button
-                        key={preset.label}
-                        onClick={() => setPupilPalette(pupil.id, preset)}
-                        title={preset.label}
-                        style={{
-                          width: 32, height: 32, borderRadius: '50%',
-                          background: preset.color,
-                          border: current.color === preset.color ? '3px solid var(--text)' : '3px solid transparent',
-                          outline: current.color === preset.color ? `2px solid ${preset.color}` : 'none',
-                          outlineOffset: 2,
-                          cursor: 'pointer',
-                          transition: 'transform 0.15s',
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <p style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginTop: 6 }}>
-                    Selected: <span style={{ color: current.color, fontWeight: 600 }}>{current.label}</span>
-                  </p>
-                </div>
-              );
-            })}
+            <p style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: demoMode ? 12 : 0, lineHeight: 1.5 }}>
+              Shows a preview card with example data — useful for testing layouts before a new child joins.
+            </p>
+            {demoMode && (
+              <>
+                <p style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 12 }}>Accent colour for the demo card.</p>
+                <ColourPickerRow
+                  colour={demoColour}
+                  onChange={handleDemoColour}
+                />
+              </>
+            )}
           </div>
         </div>
       )}
@@ -400,6 +370,53 @@ export default function SettingsPage() {
   );
 }
 
+/** A swatch button that opens a native HTML colour picker + displays the hex value. */
+function ColourPickerRow({
+  colour,
+  onChange,
+}: {
+  colour: string;
+  inputRef?: (el: HTMLInputElement | null) => void; // kept for API compat, unused
+  onChange: (hex: string) => void;
+}) {
+  const localRef = useRef<HTMLInputElement | null>(null);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      {/* Hidden native colour input */}
+      <input
+        ref={localRef}
+        type="color"
+        value={colour}
+        onChange={e => onChange(e.target.value)}
+        style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
+        tabIndex={-1}
+      />
+      {/* Visible swatch that triggers the picker */}
+      <button
+        onClick={() => localRef.current?.click()}
+        style={{
+          width: 40, height: 40, borderRadius: 8, border: '2px solid var(--border)',
+          background: colour, cursor: 'pointer', flexShrink: 0,
+          boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+          transition: 'transform 0.15s',
+        }}
+        title="Pick a colour"
+        aria-label="Pick a colour"
+      />
+      {/* Hex label */}
+      <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-2)' }}>
+        {colour.toUpperCase()}
+      </span>
+      {/* Mini colour preview strip */}
+      <div style={{
+        flex: 1, height: 8, borderRadius: 4,
+        background: `linear-gradient(to right, ${colour}22, ${colour})`,
+        minWidth: 0,
+      }} />
+    </div>
+  );
+}
+
 const styles: Record<string, React.CSSProperties> = {
   page: { maxWidth: 560, margin: '0 auto', padding: '24px 16px 48px' },
   header: { marginBottom: 28 },
@@ -409,7 +426,9 @@ const styles: Record<string, React.CSSProperties> = {
   loading: { color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontSize: 13 },
   section: { padding: '24px', marginBottom: 16 },
   sectionTitle: { fontSize: 14, fontWeight: 600, marginBottom: 6 },
-  sectionDesc: { fontSize: 12, color: 'var(--text-2)', lineHeight: 1.5, marginBottom: 16 },
+  sectionDesc: { fontSize: 12, color: 'var(--text-2)', lineHeight: 1.5, marginBottom: 20 },
+  subSection: { marginBottom: 24, paddingBottom: 24, borderBottom: '1px solid var(--border)' },
+  subLabel: { fontSize: 13, fontWeight: 600, marginBottom: 4 },
   link: { color: 'var(--text)', textDecoration: 'underline' },
   input: { width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 4, fontSize: 13, fontFamily: 'var(--font-mono)', background: 'var(--surface-2)', color: 'var(--text)', outline: 'none' },
   toggleList: { display: 'flex', flexDirection: 'column' },
