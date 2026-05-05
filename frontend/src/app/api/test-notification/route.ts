@@ -2,11 +2,8 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { Storage } from '@google-cloud/storage';
-import { initializeApp, getApps } from 'firebase-admin/app';
-import { getMessaging } from 'firebase-admin/messaging';
 import type { UserPrefsConfig } from '@classcharts/shared';
 
-// ── GCS prefs ─────────────────────────────────────────────────
 const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
 
 async function getFcmTokensForEmail(email: string): Promise<string[]> {
@@ -23,23 +20,46 @@ async function getFcmTokensForEmail(email: string): Promise<string[]> {
   }
 }
 
-export async function POST() {
-  // Wrap entire handler so any uncaught error is written to GCS for diagnosis
-  try {
-    return await handlePost();
-  } catch (err) {
-    const msg = `${new Date().toISOString()}
-${String(err)}
-${(err as any)?.stack ?? ''}`;
-    try {
-      await storage.bucket(process.env.GCS_BUCKET!).file('config/test-notification-error.txt').save(msg, { contentType: 'text/plain' });
-    } catch { /* ignore diagnostic write failure */ }
-    console.error('test-notification crash:', err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+// Get an access token from the GCP metadata server (works on App Engine + Cloud Run)
+async function getAccessToken(): Promise<string> {
+  const res = await fetch(
+    'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token',
+    { headers: { 'Metadata-Flavor': 'Google' } }
+  );
+  if (!res.ok) throw new Error(`Metadata server ${res.status}: ${await res.text()}`);
+  const { access_token } = await res.json();
+  return access_token;
+}
+
+async function sendFcmViaRest(token: string, title: string, body: string, projectId: string): Promise<void> {
+  const accessToken = await getAccessToken();
+  const res = await fetch(
+    `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: {
+          token,
+          notification: { title, body },
+          webpush: {
+            notification: { icon: '/icons/icon-192x192.png', badge: '/icons/icon-96x96.png' },
+            fcm_options: { link: '/settings' },
+          },
+        },
+      }),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`FCM REST ${res.status}: ${err}`);
   }
 }
 
-async function handlePost() {
+export async function POST() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -50,7 +70,6 @@ async function handlePost() {
   // ── Pushover ──────────────────────────────────────────────
   const pushoverToken = process.env.PUSHOVER_API_TOKEN;
   const pushoverKey = process.env.PUSHOVER_USER_KEY;
-  // Check GCS config first (set via /settings), fall back to env var
   let pushoverEnabled = process.env.PUSHOVER_ENABLED !== 'false';
   try {
     const [prefsContent] = await storage.bucket(process.env.GCS_BUCKET!).file('config/user-prefs.json').download();
@@ -79,40 +98,21 @@ async function handlePost() {
     results.pushover = 'disabled';
   }
 
-  // ── Firebase Admin init (deferred so errors are catchable) ──
-  if (!getApps().length) {
-    try {
-      initializeApp();
-    } catch (initErr) {
-      console.error('Firebase Admin initializeApp failed:', initErr);
-      results.fcm = `error: Firebase Admin init failed — ${String(initErr)}`;
-      const anyOk = Object.values(results).some(v => v === 'ok' || v.startsWith('ok'));
-      return NextResponse.json({ ok: anyOk, results }, { status: anyOk ? 200 : 500 });
-    }
-  }
-
-  // ── FCM ───────────────────────────────────────────────────
+  // ── FCM via REST API (no firebase-admin SDK needed) ───────
   const fcmTokens = await getFcmTokensForEmail(email);
+  const projectId = process.env.GCP_PROJECT_ID!;
 
   if (fcmTokens.length > 0) {
-    try {
-      const messaging = getMessaging();
-      const sends = await Promise.allSettled(
-        fcmTokens.map(token =>
-          messaging.send({
-            token,
-            notification: { title: '🧪 Test — ClassCharts (FCM)', body: `FCM channel working ✓\n${time}` },
-            webpush: {
-              notification: { icon: '/icons/icon-192x192.png', badge: '/icons/icon-96x96.png' },
-              fcmOptions: { link: '/settings' },
-            },
-          })
-        )
-      );
-      const failed = sends.filter(r => r.status === 'rejected').length;
-      results.fcm = failed === 0 ? `ok (${fcmTokens.length} token${fcmTokens.length > 1 ? 's' : ''})` : `${failed}/${fcmTokens.length} failed`;
-    } catch (err) {
-      results.fcm = `error: ${String(err)}`;
+    const sends = await Promise.allSettled(
+      fcmTokens.map(token =>
+        sendFcmViaRest(token, '🧪 Test — ClassCharts (FCM)', `FCM channel working ✓\n${time}`, projectId)
+      )
+    );
+    const failed = sends.filter(r => r.status === 'rejected');
+    if (failed.length === 0) {
+      results.fcm = `ok (${fcmTokens.length} token${fcmTokens.length > 1 ? 's' : ''})`;
+    } else {
+      results.fcm = `${failed.length}/${fcmTokens.length} failed: ${(failed[0] as PromiseRejectedResult).reason}`;
     }
   } else {
     results.fcm = 'no tokens registered — visit /settings and enable notifications first';
