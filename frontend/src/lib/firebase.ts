@@ -24,11 +24,20 @@ export function getFirebaseApp(): FirebaseApp {
 
 export function getFirebaseMessaging(): Messaging | null {
   if (typeof window === 'undefined') return null;
+
+  // Guard: if config values are missing the app will init but messaging will fail
+  const missing = Object.entries(firebaseConfig).filter(([, v]) => !v).map(([k]) => k);
+  if (missing.length > 0) {
+    console.error('FCM: missing Firebase config keys:', missing.join(', '));
+    return null;
+  }
+
   try {
     const app = getFirebaseApp();
     messaging = getMessaging(app);
     return messaging;
-  } catch {
+  } catch (err) {
+    console.error('FCM: getMessaging() threw:', err);
     return null;
   }
 }
