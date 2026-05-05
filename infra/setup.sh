@@ -93,6 +93,16 @@ echo "✅ Pub/Sub subscription configured with OIDC auth"
 echo "  3. Deploy frontend: cd frontend && gcloud app deploy"
 echo "  4. Set env vars/secrets via Secret Manager"
 
+# ── Firebase secrets (FCM) ────────────────────────────────────
+echo "▶ Creating Firebase secret placeholders (update values manually)..."
+for SECRET in FIREBASE_API_KEY FIREBASE_AUTH_DOMAIN FIREBASE_PROJECT_ID FIREBASE_STORAGE_BUCKET FIREBASE_MESSAGING_SENDER_ID FIREBASE_APP_ID FIREBASE_VAPID_KEY PUSHOVER_ENABLED; do
+  gcloud secrets describe "$SECRET" --project="$PROJECT_ID" &>/dev/null ||     gcloud secrets create "$SECRET" --project="$PROJECT_ID" --replication-policy=automatic
+  echo "  ✓ $SECRET"
+done
+echo "ℹ️  Populate Firebase secrets from the Firebase Console → Project Settings → General → Your apps"
+echo "ℹ️  VAPID key: Firebase Console → Cloud Messaging → Web Push certificates → Key pair"
+echo "ℹ️  Set PUSHOVER_ENABLED to 'true' for parallel run, then 'false' to cut over to FCM-only"
+
 # ── 3pm Homework Digest Scheduler ─────────────────────────────
 echo "▶ Creating 3pm homework digest scheduler job..."
 gcloud scheduler jobs create pubsub classcharts-digest \

@@ -70,12 +70,12 @@ const DEPENDENCIES: Record<string, DependencyInfo> = {
     with: 'claude-sonnet-4-6 via https://api.anthropic.com/v1/messages. API key from Secret Manager. Rate limit: ~65s inter-topic delay for bulk operations.',
     degradesGracefully: true,
   },
-  pushover: {
-    label: 'Pushover',
+  fcm: {
+    label: 'Firebase Messaging',
     what: 'Push notifications to parents for new homework, behaviour, announcements, attendance alerts',
-    why: 'Real-time alerts. Degrades gracefully — data is still archived to Firestore if Pushover fails.',
+    why: 'Push notifications to parents. Degrades gracefully — data is still archived to Firestore if FCM fails.',
     when: 'Called for each new event detected by the poller.',
-    with: 'https://api.pushover.net/1/messages.json. Per-parent toggles in user-prefs.json control which events trigger notifications.',
+    with: 'Firebase Admin SDK messaging.send(). FCM tokens registered per-device via /settings and stored in GCS user-prefs.json.',
     degradesGracefully: true,
   },
   gcal: {
@@ -96,7 +96,7 @@ const DEPENDENCIES: Record<string, DependencyInfo> = {
   },
   secretmanager: {
     label: 'Secret Manager',
-    what: 'All credentials — ClassCharts passwords, Google OAuth keys, Pushover keys, Anthropic API key',
+    what: 'All credentials — ClassCharts passwords, Google OAuth keys, Anthropic API key',
     why: 'Required at startup. Without it the poller cannot log in to anything.',
     when: 'Read once at poller startup and at frontend deploy time (written to app.yaml env vars).',
     with: 'Google Cloud Secret Manager. Project: classcharts. Accessed via gcloud CLI in deploy scripts and via @google-cloud/secret-manager in the poller.',

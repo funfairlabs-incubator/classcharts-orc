@@ -1,13 +1,12 @@
 import { loginAllParents, todayStr, daysAgoStr } from '@classcharts/shared';
 import type { CCStudent } from '@classcharts/shared';
 import { getState, saveState, writeHeartbeat } from './state.js';
-import { sendPushoverToKeys } from './pushover.js';
+import { sendNotification } from './notify.js';
 import { formatHomework, formatHomeworkOverdue, formatHomeworkStatusChange, formatActivity, formatAnnouncement, formatAttendance, formatDetention } from './formatter.js';
 import { analyseAnnouncement, summariseHomework, summariseActivity } from './claude.js';
 import { ensureCalendarsExist, createCalendarEvents, updateCalendarEventTitles } from './calendar.js';
 import { ensureTaskListsExist, createHomeworkTask, updateHomeworkTaskStatus, type HomeworkStatus } from './tasks.js';
-// testing out branch rulesets - this is just a comment
-import { getEnabledKeys } from './prefs.js';
+import { getEnabledKeys, getEnabledFcmTokens } from './prefs.js';
 import { archiveAnnouncement, downloadAndSaveAttachments } from './archive.js';
 
 export async function pollClassCharts(): Promise<void> {
@@ -55,9 +54,10 @@ ${(err as any)?.stack ?? ''}`,
           const newPoints = activity.filter(a => a.id > state.lastActivityId);
           if (newPoints.length > 0) {
             const keys = await getEnabledKeys('behaviour');
+            const fcmTokens = await getEnabledFcmTokens('behaviour');
             for (const point of newPoints) {
               const summary = await summariseActivity(point, pupil.name);
-              await sendPushoverToKeys(keys, formatActivity(point, pupil.name, summary));
+              await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }))(formatActivity(point, pupil.name, summary)));
             }
             state.lastActivityId = Math.max(...newPoints.map(a => a.id));
             changed = true;
@@ -74,9 +74,10 @@ ${(err as any)?.stack ?? ''}`,
           const newHomeworks = homeworks.filter(h => h.id > state.lastHomeworkId);
           if (newHomeworks.length > 0) {
             const keys = await getEnabledKeys('homeworkNew');
+            const fcmTokens = await getEnabledFcmTokens('homeworkNew');
             for (const hw of newHomeworks) {
               const summary = await summariseHomework(hw);
-              await sendPushoverToKeys(keys, formatHomework(hw, pupil.name, summary));
+              await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }))(formatHomework(hw, pupil.name, summary)));
 
               // Calendar event on issue date — "homework was set today"
               if (calendarConfig && hw.issueDate) {
@@ -142,9 +143,10 @@ ${(err as any)?.stack ?? ''}`,
             !knownOverdueIds.includes(h.id)
           );
           if (overdueItems.length > 0) {
-            const keys = await getEnabledKeys('homeworkNew'); // overdue uses same toggle
+            const keys = await getEnabledKeys('homeworkNew');
+            const fcmTokens = await getEnabledFcmTokens('homeworkNew'); // overdue uses same toggle
             for (const hw of overdueItems) {
-              await sendPushoverToKeys(keys, formatHomeworkOverdue(hw, pupil.name));
+              await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }))(formatHomeworkOverdue(hw, pupil.name)));
             }
             (state as any).knownOverdueIds = [...knownOverdueIds, ...overdueItems.map(h => h.id)].slice(-100);
             changed = true;
@@ -159,11 +161,12 @@ ${(err as any)?.stack ?? ''}`,
           });
           if (statusChanges.length > 0) {
             const keys = await getEnabledKeys('homeworkStatusChange');
+            const fcmTokens = await getEnabledFcmTokens('homeworkStatusChange');
             const calMap: Record<number, string[]> = (state as any).homeworkCalendarIds ?? {};
             for (const hw of statusChanges) {
               const prev = knownStatuses[hw.id];
               const curr = hw.status ?? (hw.ticked ? 'ticked' : 'pending');
-              await sendPushoverToKeys(keys, formatHomeworkStatusChange(hw, pupil.name, prev, curr));
+              await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }))(formatHomeworkStatusChange(hw, pupil.name, prev, curr)));
 
               // Update calendar event title
               if (calendarConfig && calMap[hw.id]?.length) {
@@ -215,7 +218,8 @@ ${(err as any)?.stack ?? ''}`,
           const newAnnouncements = announcements.filter(a => !seenSet.has(a.id));
           if (newAnnouncements.length > 0) {
             const keys = await getEnabledKeys('announcements');
-            console.log(`  New announcements: ${newAnnouncements.length}, pushover keys: ${keys.length}`);
+            const fcmTokens = await getEnabledFcmTokens('announcements');
+            console.log(`  New announcements: ${newAnnouncements.length}, pushover keys: ${keys.length}, fcm tokens: ${fcmTokens.length}`);
             const authHeaders = client.getAuthHeaders();
             for (const ann of newAnnouncements) {
               // Archive to Firestore + download attachments to GCS
@@ -229,7 +233,7 @@ ${(err as any)?.stack ?? ''}`,
                 try { await createCalendarEvents(analysis.calendarEvents, calendarConfig); calendarAdded = true; }
                 catch (err) { console.error('  Calendar event creation failed:', err); }
               }
-              await sendPushoverToKeys(keys, formatAnnouncement(ann, pupil.name, analysis.summary, analysis.requiresAction, analysis.actionDescription, calendarAdded));
+              await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }))(formatAnnouncement(ann, pupil.name, analysis.summary, analysis.requiresAction, analysis.actionDescription, calendarAdded)));
               seenSet.add(ann.id);
             }
             // Keep last 50 seen IDs to avoid unbounded growth
@@ -256,12 +260,13 @@ ${(err as any)?.stack ?? ''}`,
           }
           if (newAlerts.length > 0) {
             const keys = await getEnabledKeys('attendance');
+            const fcmTokens = await getEnabledFcmTokens('attendance');
             const newDays = attendance.days.filter(d =>
               Object.entries(d.sessions).some(([sess, info]) => newAlerts.includes(`${d.date}:${sess}:${info.status}`))
             );
             for (const day of newDays) {
               const msg = formatAttendance(day, pupil.name);
-              if (msg) await sendPushoverToKeys(keys, msg);
+              if (msg) await sendNotification(keys, fcmTokens, { title: msg.title, body: msg.message, url: msg.url });
             }
             (state as any).knownAttendanceKeys = [...knownAttendanceKeys, ...newAlerts].slice(-200);
             changed = true;
@@ -277,7 +282,8 @@ ${(err as any)?.stack ?? ''}`,
           const newDetentions = detentions.filter(d => !knownIds.includes(d.id));
           if (newDetentions.length > 0) {
             const keys = await getEnabledKeys('detentions');
-            for (const det of newDetentions) await sendPushoverToKeys(keys, formatDetention(det, pupil.name));
+            const fcmTokens = await getEnabledFcmTokens('detentions');
+            for (const det of newDetentions) await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }))(formatDetention(det, pupil.name)));
             (state as any).knownDetentionIds = [...knownIds, ...newDetentions.map(d => d.id)].slice(-50);
             changed = true;
           }
@@ -299,7 +305,8 @@ ${(err as any)?.stack ?? ''}`,
       gcs:            pollErrors.some(e => e.includes('Storage') || e.includes('GCS') || e.includes('bucket') || e.includes('attachment')) ? 'error' : 'ok',
       pubsub:         'ok', // If poller ran, Pub/Sub delivered successfully
       anthropic:      pollErrors.some(e => e.includes('Anthropic') || e.includes('claude') || e.includes('summarise')) ? 'error' : 'ok',
-      pushover:       pollErrors.some(e => e.includes('Pushover') || e.includes('pushover')) ? 'error' : 'ok',
+      fcm:            pollErrors.some(e => e.includes('FCM') || e.includes('firebase') || e.includes('messaging')) ? 'error' : 'ok',
+      pushover:       process.env.PUSHOVER_ENABLED !== 'false' ? (pollErrors.some(e => e.includes('Pushover') || e.includes('pushover')) ? 'error' : 'ok') : 'disabled',
       gcal:           pollErrors.some(e => e.includes('Calendar') || e.includes('calendar') || e.includes('calendarConfig')) ? 'error' : 'ok',
       gtasks:         pollErrors.some(e => e.includes('Task') || e.includes('task') || e.includes('tasksConfig')) ? 'error' : 'ok',
       secretmanager:  'ok', // If poller started, secrets were read successfully
