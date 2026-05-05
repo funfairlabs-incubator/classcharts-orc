@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 interface Heartbeat {
   polledAt: string;
   pupils: string[];
-  dependencies: Record<string, 'ok' | 'error'>;
+  dependencies: Record<string, 'ok' | 'error' | 'disabled'>;
   errors?: string[];
   updatedAt: string;
 }
@@ -276,9 +276,9 @@ export default function StatusPage() {
                   <button onClick={() => setExpandedDep(isExpanded ? null : key)} style={{
                     width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer',
                     padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10,
-                    borderLeft: `3px solid ${val === 'ok' ? 'var(--positive)' : val === 'unknown' ? 'var(--border)' : 'var(--negative)'}`,
+                    borderLeft: `3px solid ${val === 'ok' ? 'var(--positive)' : val === 'unknown' || val === 'disabled' ? 'var(--border)' : 'var(--negative)'}`,
                   }}>
-                    <span style={{ fontSize: 14, flexShrink: 0, color: val === 'ok' ? 'var(--positive)' : val === 'unknown' ? 'var(--text-3)' : 'var(--negative)' }}>{val === 'ok' ? '✓' : val === 'unknown' ? '?' : '✗'}</span>
+                    <span style={{ fontSize: 14, flexShrink: 0, color: val === 'ok' ? 'var(--positive)' : val === 'unknown' || val === 'disabled' ? 'var(--text-3)' : 'var(--negative)' }}>{val === 'ok' ? '✓' : val === 'unknown' || val === 'disabled' ? '–' : '✗'}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontSize: 13, fontWeight: 600 }}>{dep?.label ?? key}</p>
                       <p style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dep?.what ?? ''}</p>
@@ -287,15 +287,15 @@ export default function StatusPage() {
                       {dep?.degradesGracefully && <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', padding: '1px 5px', borderRadius: 3, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>graceful</span>}
                       <span style={{
                         fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)',
-                        color: val === 'ok' ? 'var(--positive)' : val === 'unknown' ? 'var(--text-3)' : 'var(--negative)',
+                        color: val === 'ok' ? 'var(--positive)' : val === 'unknown' || val === 'disabled' ? 'var(--text-3)' : 'var(--negative)',
                         padding: '2px 8px', borderRadius: 4,
-                        background: val === 'ok' ? 'var(--positive-bg)' : val === 'unknown' ? 'var(--surface-2)' : 'var(--negative-bg)',
+                        background: val === 'ok' ? 'var(--positive-bg)' : val === 'unknown' || val === 'disabled' ? 'var(--surface-2)' : 'var(--negative-bg)',
                       }}>{String(val).toUpperCase()}</span>
                       <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{isExpanded ? '▲' : '▼'}</span>
                     </div>
                   </button>
                   {isExpanded && dep && (
-                    <div style={{ padding: '0 16px 14px 16px', borderLeft: `3px solid ${val === 'ok' ? 'var(--positive)' : val === 'unknown' ? 'var(--border)' : 'var(--negative)'}`, background: 'var(--surface-2)' }}>
+                    <div style={{ padding: '0 16px 14px 16px', borderLeft: `3px solid ${val === 'ok' ? 'var(--positive)' : val === 'unknown' || val === 'disabled' ? 'var(--border)' : 'var(--negative)'}`, background: 'var(--surface-2)' }}>
                       {[
                         { label: 'What', value: dep.what },
                         { label: 'Why', value: dep.why },
