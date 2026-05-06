@@ -48,8 +48,21 @@ const NAV = [
 function AppShellInner({ children, session }: { children: React.ReactNode; session: any }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
   const { pupils, activePupil, setActivePupilId } = usePupil();
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Capture PWA install prompt
+  useEffect(() => {
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true);
+    }
+    const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); };
+    window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', () => { setIsInstalled(true); setInstallPrompt(null); });
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
 
   // Apply saved theme colour on load
   useEffect(() => {
@@ -74,6 +87,14 @@ function AppShellInner({ children, session }: { children: React.ReactNode; sessi
     if (menuOpen) document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [menuOpen]);
+
+  async function installPwa() {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') { setIsInstalled(true); setInstallPrompt(null); }
+    setMenuOpen(false);
+  }
 
   // Close menu on nav
   useEffect(() => { setMenuOpen(false); }, [pathname]);
@@ -150,6 +171,12 @@ function AppShellInner({ children, session }: { children: React.ReactNode; sessi
                   <span style={styles.dropdownIcon}>🛡</span>
                   Admin
                 </Link>
+              )}
+              {!isInstalled && installPrompt && (
+                <button onClick={installPwa} style={{ ...styles.dropdownItem, width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer', background: 'transparent' }}>
+                  <span style={styles.dropdownIcon}>📲</span>
+                  Install app
+                </button>
               )}
               <div style={styles.dropdownFooter}>
                 <button onClick={() => signOut()} style={styles.signOutBtn}>Sign out</button>
