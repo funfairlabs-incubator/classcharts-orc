@@ -11,6 +11,9 @@ import { sendPushoverToKeys } from './pushover.js';
 import type { PushoverMessage } from './pushover.js';
 import { getAllPrefs } from './prefs.js';
 
+const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
+const ONESIGNAL_APP_ID  = process.env.ONESIGNAL_APP_ID;
+
 export interface NotifyMessage {
   title: string;
   body: string;
@@ -19,13 +22,14 @@ export interface NotifyMessage {
 }
 
 /**
- * Send a notification to a set of Pushover keys AND/OR FCM tokens.
- * Callers pass both arrays; this module decides which channels are live.
+ * Send a notification across all enabled channels.
+ * Callers pass keys/tokens for each channel; this module gates on config.
  */
 export async function sendNotification(
   pushoverKeys: string[],
   fcmTokens: string[],
   msg: NotifyMessage,
+  oneSignalIds: string[] = [],
 ): Promise<void> {
   // GCS config takes precedence over env var — allows toggling from the Settings UI
   const config = await getAllPrefs();
@@ -48,7 +52,39 @@ export async function sendNotification(
     tasks.push(sendFcm(fcmTokens, msg));
   }
 
+  // ── OneSignal ─────────────────────────────────────────────
+  if (fcmEnabled && oneSignalIds.length > 0) {
+    tasks.push(sendOneSignal(oneSignalIds, msg));
+  }
+
   await Promise.allSettled(tasks);
+}
+
+async function sendOneSignal(ids: string[], msg: NotifyMessage): Promise<void> {
+  if (!ONESIGNAL_API_KEY || !ONESIGNAL_APP_ID) {
+    console.warn('  OneSignal: missing API key or App ID');
+    return;
+  }
+  const res = await fetch('https://onesignal.com/api/v1/notifications', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Key ${ONESIGNAL_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      app_id: ONESIGNAL_APP_ID,
+      include_subscription_ids: ids,
+      headings: { en: msg.title },
+      contents: { en: msg.body },
+      url: msg.url ?? 'https://classcharts.funfairlabs.com',
+      chrome_web_icon: '/icons/icon-192x192.png',
+      chrome_web_badge: '/icons/icon-96x96.png',
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error(`  OneSignal send failed: ${res.status} ${err}`);
+  }
 }
 
 async function sendFcm(tokens: string[], msg: NotifyMessage): Promise<void> {

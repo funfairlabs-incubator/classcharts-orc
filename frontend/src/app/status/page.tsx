@@ -71,11 +71,11 @@ const DEPENDENCIES: Record<string, DependencyInfo> = {
     degradesGracefully: true,
   },
   fcm: {
-    label: 'Firebase Messaging',
+    label: 'OneSignal',
     what: 'Push notifications to parents for new homework, behaviour, announcements, attendance alerts',
     why: 'Push notifications via Firebase Cloud Messaging. Both Pushover and FCM can run in parallel; each channel toggled independently from Settings → Notification Channels (admin only). Defaults: Pushover on, FCM off.',
     when: 'Called for each new event detected by the poller.',
-    with: 'Firebase Admin SDK messaging.send(). FCM tokens registered per-device: browser registers firebase-messaging-sw.js, calls getToken() with VAPID key, token stored in GCS user-prefs.json. If red: check VAPID key in Secret Manager, check Firebase Console → Cloud Messaging, verify users have visited /settings and enabled notifications.',
+    with: 'OneSignal REST API v1 /notifications. Subscription IDs registered per-device via /settings → Enable notifications, stored in GCS user-prefs.json. If red: check ONESIGNAL_API_KEY and ONESIGNAL_APP_ID in Secret Manager, verify users have visited /settings and registered their device.',
     degradesGracefully: true,
   },
   gcal: {

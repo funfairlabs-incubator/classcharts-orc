@@ -2,8 +2,7 @@
 import { useSession } from 'next-auth/react';
 import { useEffect, useRef, useState } from 'react';
 import { usePupil } from '@/lib/usePupil';
-import { getFirebaseMessaging } from '@/lib/firebase';
-import { getToken } from 'firebase/messaging';
+import { getOneSignal, getOneSignalUserId } from '@/lib/onesignal';
 
 interface NotificationPrefs {
   homeworkDigest: boolean;
@@ -116,8 +115,8 @@ export default function SettingsPage() {
       })
       .catch(() => {});
 
-    // Check if this device already has a token registered
-    fetch('/api/fcm-token')
+    // Check if this device already has a OneSignal ID registered
+    fetch('/api/onesignal-id')
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.registered) setNotifStatus('registered'); })
       .catch(() => {});
@@ -141,41 +140,31 @@ export default function SettingsPage() {
     setTimeout(() => setTesting('idle'), 4000);
   }
 
-  async function registerFcmToken() {
+  async function registerOneSignal() {
     setNotifStatus('registering');
     try {
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') { setNotifStatus('denied'); return; }
-      const messaging = getFirebaseMessaging();
-      if (!messaging) { console.error('FCM: getFirebaseMessaging() returned null'); setNotifStatus('error'); return; }
+      const os = await getOneSignal();
+      if (!os) { console.error('OneSignal: SDK not loaded'); setNotifStatus('error'); return; }
 
-      // Explicitly register the service worker — don't assume it's already registered
-      let swReg: ServiceWorkerRegistration | undefined;
-      try {
-        swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
-        await swReg.update();
-        console.log('FCM: service worker registered', swReg.scope);
-      } catch (swErr) {
-        console.error('FCM: service worker registration failed', swErr);
-        setNotifStatus('error');
-        return;
-      }
+      // Request permission and subscribe
+      await os.Notifications.requestPermission();
+      const permission = os.Notifications.permission;
+      if (!permission) { setNotifStatus('denied'); return; }
 
-      const token = await getToken(messaging, {
-        vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
-        serviceWorkerRegistration: swReg,
-      });
-      console.log('FCM: token obtained', token ? token.slice(0, 20) + '…' : 'null');
-      if (!token) { setNotifStatus('error'); return; }
-      const res = await fetch('/api/fcm-token', {
+      // Get the subscription ID
+      const id = await getOneSignalUserId();
+      console.log('OneSignal: subscription ID', id ? id.slice(0, 20) + '…' : 'null');
+      if (!id) { setNotifStatus('error'); return; }
+
+      const res = await fetch('/api/onesignal-id', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ id }),
       });
-      console.log('FCM: token saved', res.status);
+      console.log('OneSignal: ID saved', res.status);
       setNotifStatus(res.ok ? 'registered' : 'error');
     } catch (err) {
-      console.error('FCM registration failed:', err);
+      console.error('OneSignal registration failed:', err);
       setNotifStatus('error');
     }
   }
@@ -279,7 +268,7 @@ export default function SettingsPage() {
             background: notifStatus === 'registered' || notifStatus === 'granted' ? 'var(--positive-bg)' : notifStatus === 'error' || notifStatus === 'denied' ? 'var(--negative-bg)' : 'var(--surface-2)',
             color: notifStatus === 'registered' || notifStatus === 'granted' ? 'var(--positive)' : notifStatus === 'error' || notifStatus === 'denied' ? 'var(--negative)' : 'var(--text)',
           }}
-          onClick={registerFcmToken}
+          onClick={registerOneSignal}
           disabled={notifStatus === 'registering' || notifStatus === 'registered'}
         >
           {notifStatus === 'registering' ? 'Registering…' : notifStatus === 'registered' ? '✓ Notifications enabled' : notifStatus === 'granted' ? '✓ Already enabled — re-register' : notifStatus === 'denied' ? '✕ Blocked — check browser settings' : notifStatus === 'error' ? '✕ Failed — try again' : '🔔 Enable notifications on this device'}
@@ -444,9 +433,9 @@ export default function SettingsPage() {
           {/* FCM */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingTop: 16, marginTop: 12, borderTop: '1px solid var(--border)' }}>
             <div>
-              <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>Firebase Cloud Messaging</p>
+              <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>OneSignal</p>
               <p style={{ fontSize: 12, color: 'var(--text-2)' }}>
-                {fcmEnabled ? 'On — web push to registered devices' : 'Off — enable once devices are registered'}
+                {fcmEnabled ? 'On — rich push to registered devices' : 'Off — enable once devices are registered'}
               </p>
             </div>
             <button

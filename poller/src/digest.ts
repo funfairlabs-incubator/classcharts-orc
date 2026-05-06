@@ -1,6 +1,6 @@
 import { loginAllParents, todayStr, daysAgoStr } from '@classcharts/shared';
 import type { CCHomework } from '@classcharts/shared';
-import { getEnabledKeys, getEnabledFcmTokens } from './prefs.js';
+import { getEnabledKeys, getEnabledFcmTokens, getEnabledOneSignalIds } from './prefs.js';
 import { sendNotification } from './notify.js';
 
 function formatDate(dateStr: string): string {
@@ -24,8 +24,9 @@ export async function sendHomeworkDigest(): Promise<void> {
   const keys = await getEnabledKeys('homeworkDigest');
 
   const fcmTokens = await getEnabledFcmTokens('homeworkDigest');
+  const oneSignalIds = await getEnabledOneSignalIds('homeworkDigest');
 
-  if (keys.length === 0 && fcmTokens.length === 0) {
+  if (keys.length === 0 && fcmTokens.length === 0 && oneSignalIds.length === 0) {
     console.log('Digest: no users have homeworkDigest enabled, skipping.');
     return;
   }
@@ -56,7 +57,7 @@ export async function sendHomeworkDigest(): Promise<void> {
     await sendNotification(keys, fcmTokens, {
       title: '📚 Homework this week',
       body: 'Nothing due in the next 7 days. 🎉',
-    });
+    }, oneSignalIds);
     return;
   }
 
@@ -78,7 +79,7 @@ export async function sendHomeworkDigest(): Promise<void> {
     title: '📚 Homework due this week',
     body: lines.join('\n'),
     url: '/homework',
-  });
+  }, oneSignalIds);
 
   console.log(`Digest sent to ${keys.length} pushover / ${fcmTokens.length} FCM, ${byPupil.reduce((n, p) => n + p.items.length, 0)} items across ${byPupil.length} pupil(s)`);
 }

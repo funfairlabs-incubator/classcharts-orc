@@ -6,7 +6,7 @@ import type { UserPrefsConfig } from '@classcharts/shared';
 
 const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
 
-async function getFcmTokensForEmail(email: string): Promise<string[]> {
+async function getOneSignalIdsForEmail(email: string): Promise<string[]> {
   try {
     const [content] = await storage
       .bucket(process.env.GCS_BUCKET!)
@@ -14,49 +14,29 @@ async function getFcmTokensForEmail(email: string): Promise<string[]> {
       .download();
     const config: UserPrefsConfig = JSON.parse(content.toString());
     const prefs = config.prefs.find(p => p.email.toLowerCase() === email.toLowerCase());
-    return prefs?.fcmTokens ?? [];
+    return prefs?.oneSignalIds ?? [];
   } catch {
     return [];
   }
 }
 
-// Get an access token from the GCP metadata server (works on App Engine + Cloud Run)
-async function getAccessToken(): Promise<string> {
-  const res = await fetch(
-    'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token',
-    { headers: { 'Metadata-Flavor': 'Google' } }
-  );
-  if (!res.ok) throw new Error(`Metadata server ${res.status}: ${await res.text()}`);
-  const { access_token } = await res.json();
-  return access_token;
-}
-
-async function sendFcmViaRest(token: string, title: string, body: string, projectId: string): Promise<void> {
-  const accessToken = await getAccessToken();
-  const res = await fetch(
-    `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message: {
-          token,
-          notification: { title, body },
-          webpush: {
-            notification: { icon: '/icons/icon-192x192.png', badge: '/icons/icon-96x96.png' },
-            fcm_options: { link: '/settings' },
-          },
-        },
-      }),
-    }
-  );
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`FCM REST ${res.status}: ${err}`);
-  }
+async function sendOneSignalNotification(ids: string[], title: string, body: string): Promise<void> {
+  const res = await fetch('https://onesignal.com/api/v1/notifications', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Key ${process.env.ONESIGNAL_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      app_id: process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID,
+      include_subscription_ids: ids,
+      headings: { en: title },
+      contents: { en: body },
+      url: 'https://classcharts.funfairlabs.com/settings',
+      chrome_web_icon: '/icons/icon-192x192.png',
+    }),
+  });
+  if (!res.ok) throw new Error(`OneSignal ${res.status}: ${await res.text()}`);
 }
 
 export async function POST() {
@@ -67,9 +47,7 @@ export async function POST() {
   const time = new Date().toLocaleTimeString('en-GB');
   const results: Record<string, string> = {};
 
-  // ── Pushover ──────────────────────────────────────────────
-  const pushoverToken = process.env.PUSHOVER_API_TOKEN;
-  const pushoverKey = process.env.PUSHOVER_USER_KEY;
+  // ── Read channel config from GCS ──────────────────────────
   let pushoverEnabled = process.env.PUSHOVER_ENABLED !== 'false';
   let fcmEnabled = false;
   try {
@@ -78,6 +56,10 @@ export async function POST() {
     if (typeof prefsConfig.pushoverEnabled === 'boolean') pushoverEnabled = prefsConfig.pushoverEnabled;
     if (typeof prefsConfig.fcmEnabled === 'boolean') fcmEnabled = prefsConfig.fcmEnabled;
   } catch { /* use env var fallback */ }
+
+  // ── Pushover ──────────────────────────────────────────────
+  const pushoverToken = process.env.PUSHOVER_API_TOKEN;
+  const pushoverKey = process.env.PUSHOVER_USER_KEY;
 
   if (pushoverEnabled && pushoverToken && pushoverKey) {
     try {
@@ -100,25 +82,24 @@ export async function POST() {
     results.pushover = 'disabled';
   }
 
-  // ── FCM via REST API (no firebase-admin SDK needed) ───────
-  const fcmTokens = await getFcmTokensForEmail(email);
-  // FCM REST API requires the Firebase project ID, not the GCP project ID
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? process.env.GCP_PROJECT_ID!;
+  // ── OneSignal ─────────────────────────────────────────────
+  const oneSignalIds = await getOneSignalIdsForEmail(email);
 
-  if (fcmEnabled && fcmTokens.length > 0) {
-    const sends = await Promise.allSettled(
-      fcmTokens.map(token =>
-        sendFcmViaRest(token, '🧪 Test — ClassCharts (FCM)', `FCM channel working ✓\n${time}`, projectId)
-      )
-    );
-    const failed = sends.filter(r => r.status === 'rejected');
-    if (failed.length === 0) {
-      results.fcm = `ok (${fcmTokens.length} token${fcmTokens.length > 1 ? 's' : ''})`;
-    } else {
-      results.fcm = `${failed.length}/${fcmTokens.length} failed: ${(failed[0] as PromiseRejectedResult).reason}`;
+  if (fcmEnabled && oneSignalIds.length > 0) {
+    try {
+      await sendOneSignalNotification(
+        oneSignalIds,
+        '🧪 Test — ClassCharts (OneSignal)',
+        `OneSignal working ✓\n${time}`
+      );
+      results.onesignal = `ok (${oneSignalIds.length} device${oneSignalIds.length > 1 ? 's' : ''})`;
+    } catch (err) {
+      results.onesignal = `error: ${String(err)}`;
     }
   } else {
-    results.fcm = fcmEnabled ? 'no tokens registered — visit /settings and enable notifications first' : 'disabled';
+    results.onesignal = fcmEnabled
+      ? 'no devices registered — visit /settings and enable notifications first'
+      : 'disabled';
   }
 
   const anyOk = Object.values(results).some(v => v === 'ok' || v.startsWith('ok'));

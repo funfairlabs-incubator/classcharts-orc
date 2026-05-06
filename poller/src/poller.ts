@@ -6,7 +6,7 @@ import { formatHomework, formatHomeworkOverdue, formatHomeworkStatusChange, form
 import { analyseAnnouncement, summariseHomework, summariseActivity } from './claude.js';
 import { ensureCalendarsExist, createCalendarEvents, updateCalendarEventTitles } from './calendar.js';
 import { ensureTaskListsExist, createHomeworkTask, updateHomeworkTaskStatus, type HomeworkStatus } from './tasks.js';
-import { getEnabledKeys, getEnabledFcmTokens } from './prefs.js';
+import { getEnabledKeys, getEnabledFcmTokens, getEnabledOneSignalIds } from './prefs.js';
 import { archiveAnnouncement, downloadAndSaveAttachments } from './archive.js';
 
 export async function pollClassCharts(): Promise<void> {
@@ -55,9 +55,10 @@ ${(err as any)?.stack ?? ''}`,
           if (newPoints.length > 0) {
             const keys = await getEnabledKeys('behaviour');
             const fcmTokens = await getEnabledFcmTokens('behaviour');
+            const oneSignalIds = await getEnabledOneSignalIds('behaviour');
             for (const point of newPoints) {
               const summary = await summariseActivity(point, pupil.name);
-              await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }))(formatActivity(point, pupil.name, summary)));
+              await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }, oneSignalIds))(formatActivity(point, pupil.name, summary)));
             }
             state.lastActivityId = Math.max(...newPoints.map(a => a.id));
             changed = true;
@@ -75,9 +76,10 @@ ${(err as any)?.stack ?? ''}`,
           if (newHomeworks.length > 0) {
             const keys = await getEnabledKeys('homeworkNew');
             const fcmTokens = await getEnabledFcmTokens('homeworkNew');
+            const oneSignalIds = await getEnabledOneSignalIds('homeworkNew');
             for (const hw of newHomeworks) {
               const summary = await summariseHomework(hw);
-              await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }))(formatHomework(hw, pupil.name, summary)));
+              await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }, oneSignalIds))(formatHomework(hw, pupil.name, summary)));
 
               // Calendar event on issue date — "homework was set today"
               if (calendarConfig && hw.issueDate) {
@@ -144,9 +146,10 @@ ${(err as any)?.stack ?? ''}`,
           );
           if (overdueItems.length > 0) {
             const keys = await getEnabledKeys('homeworkNew');
-            const fcmTokens = await getEnabledFcmTokens('homeworkNew'); // overdue uses same toggle
+            const fcmTokens = await getEnabledFcmTokens('homeworkNew');
+            const oneSignalIds = await getEnabledOneSignalIds('homeworkNew'); // overdue uses same toggle
             for (const hw of overdueItems) {
-              await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }))(formatHomeworkOverdue(hw, pupil.name)));
+              await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }, oneSignalIds))(formatHomeworkOverdue(hw, pupil.name)));
             }
             (state as any).knownOverdueIds = [...knownOverdueIds, ...overdueItems.map(h => h.id)].slice(-100);
             changed = true;
@@ -162,11 +165,12 @@ ${(err as any)?.stack ?? ''}`,
           if (statusChanges.length > 0) {
             const keys = await getEnabledKeys('homeworkStatusChange');
             const fcmTokens = await getEnabledFcmTokens('homeworkStatusChange');
+            const oneSignalIds = await getEnabledOneSignalIds('homeworkStatusChange');
             const calMap: Record<number, string[]> = (state as any).homeworkCalendarIds ?? {};
             for (const hw of statusChanges) {
               const prev = knownStatuses[hw.id];
               const curr = hw.status ?? (hw.ticked ? 'ticked' : 'pending');
-              await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }))(formatHomeworkStatusChange(hw, pupil.name, prev, curr)));
+              await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }, oneSignalIds))(formatHomeworkStatusChange(hw, pupil.name, prev, curr)));
 
               // Update calendar event title
               if (calendarConfig && calMap[hw.id]?.length) {
@@ -219,6 +223,7 @@ ${(err as any)?.stack ?? ''}`,
           if (newAnnouncements.length > 0) {
             const keys = await getEnabledKeys('announcements');
             const fcmTokens = await getEnabledFcmTokens('announcements');
+            const oneSignalIds = await getEnabledOneSignalIds('announcements');
             console.log(`  New announcements: ${newAnnouncements.length}, pushover keys: ${keys.length}, fcm tokens: ${fcmTokens.length}`);
             const authHeaders = client.getAuthHeaders();
             for (const ann of newAnnouncements) {
@@ -233,7 +238,7 @@ ${(err as any)?.stack ?? ''}`,
                 try { await createCalendarEvents(analysis.calendarEvents, calendarConfig); calendarAdded = true; }
                 catch (err) { console.error('  Calendar event creation failed:', err); }
               }
-              await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }))(formatAnnouncement(ann, pupil.name, analysis.summary, analysis.requiresAction, analysis.actionDescription, calendarAdded)));
+              await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }, oneSignalIds))(formatAnnouncement(ann, pupil.name, analysis.summary, analysis.requiresAction, analysis.actionDescription, calendarAdded)));
               seenSet.add(ann.id);
             }
             // Keep last 50 seen IDs to avoid unbounded growth
@@ -261,12 +266,13 @@ ${(err as any)?.stack ?? ''}`,
           if (newAlerts.length > 0) {
             const keys = await getEnabledKeys('attendance');
             const fcmTokens = await getEnabledFcmTokens('attendance');
+            const oneSignalIds = await getEnabledOneSignalIds('attendance');
             const newDays = attendance.days.filter(d =>
               Object.entries(d.sessions).some(([sess, info]) => newAlerts.includes(`${d.date}:${sess}:${info.status}`))
             );
             for (const day of newDays) {
               const msg = formatAttendance(day, pupil.name);
-              if (msg) await sendNotification(keys, fcmTokens, { title: msg.title, body: msg.message, url: msg.url });
+              if (msg) await sendNotification(keys, fcmTokens, { title: msg.title, body: msg.message, url: msg.url }, oneSignalIds);
             }
             (state as any).knownAttendanceKeys = [...knownAttendanceKeys, ...newAlerts].slice(-200);
             changed = true;
@@ -283,7 +289,8 @@ ${(err as any)?.stack ?? ''}`,
           if (newDetentions.length > 0) {
             const keys = await getEnabledKeys('detentions');
             const fcmTokens = await getEnabledFcmTokens('detentions');
-            for (const det of newDetentions) await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }))(formatDetention(det, pupil.name)));
+            const oneSignalIds = await getEnabledOneSignalIds('detentions');
+            for (const det of newDetentions) await sendNotification(keys, fcmTokens, (m => ({ title: m.title, body: m.message, url: m.url }, oneSignalIds))(formatDetention(det, pupil.name)));
             (state as any).knownDetentionIds = [...knownIds, ...newDetentions.map(d => d.id)].slice(-50);
             changed = true;
           }

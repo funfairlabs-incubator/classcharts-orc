@@ -45,6 +45,20 @@ export async function savePrefsForEmail(prefs: UserNotificationPrefs): Promise<v
   await saveAllPrefs(config);
 }
 
+// Get all OneSignal subscription IDs for users that have a given toggle enabled
+export async function getEnabledOneSignalIds(
+  toggle: keyof UserNotificationPrefs['notifications'],
+): Promise<string[]> {
+  const config = await getAllPrefs();
+  const ids: string[] = [];
+  for (const pref of config.prefs) {
+    if (!pref.oneSignalIds?.length) continue;
+    const notifs = pref.notifications ?? DEFAULT_PREFS;
+    if (notifs[toggle]) ids.push(...pref.oneSignalIds);
+  }
+  return [...new Set(ids)];
+}
+
 // Get all FCM tokens for users that have a given toggle enabled
 export async function getEnabledFcmTokens(
   toggle: keyof UserNotificationPrefs['notifications'],
