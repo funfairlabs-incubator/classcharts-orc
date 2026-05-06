@@ -13,7 +13,6 @@
     "@classcharts/shared": "file:./vendor/shared",
     "@google-cloud/firestore": "^7.10.0",
     "@google-cloud/storage": "^7.11.0",
-    "@onesignal/onesignal-web-sdk": "^2.0.1",
     "next": "^14.2.35",
     "next-auth": "^4.24.14",
     "react": "^18.3.0",
