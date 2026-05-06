@@ -146,15 +146,26 @@ export default function SettingsPage() {
       const os = await getOneSignal();
       if (!os) { console.error('OneSignal: SDK not loaded'); setNotifStatus('error'); return; }
 
-      // Request permission and subscribe
+      // Request permission via OneSignal
       await os.Notifications.requestPermission();
       const permission = os.Notifications.permission;
+      console.log('OneSignal: permission', permission);
       if (!permission) { setNotifStatus('denied'); return; }
 
-      // Get the subscription ID
-      const id = await getOneSignalUserId();
-      console.log('OneSignal: subscription ID', id ? id.slice(0, 20) + '…' : 'null');
-      if (!id) { setNotifStatus('error'); return; }
+      // Wait for subscription ID — OneSignal creates it asynchronously after permission grant
+      let id: string | null = null;
+      for (let i = 0; i < 10; i++) {
+        id = os.User?.PushSubscription?.id ?? null;
+        console.log(`OneSignal: subscription ID attempt ${i + 1}:`, id);
+        if (id) break;
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      if (!id) {
+        console.error('OneSignal: subscription ID not available after 5s');
+        setNotifStatus('error');
+        return;
+      }
 
       const res = await fetch('/api/onesignal-id', {
         method: 'POST',
