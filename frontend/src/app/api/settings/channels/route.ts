@@ -25,30 +25,35 @@ function isAdmin(email: string): boolean {
   return email.toLowerCase() === (process.env.ADMIN_EMAIL ?? '').toLowerCase();
 }
 
-// GET /api/settings/pushover — returns { pushoverEnabled: boolean }
+// GET /api/settings/channels — returns { pushoverEnabled, fcmEnabled }
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (!isAdmin(session.user.email)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const config = await readPrefs();
-  // Default true if not set — safe during parallel run
-  return NextResponse.json({ pushoverEnabled: config.pushoverEnabled ?? true });
+  return NextResponse.json({
+    pushoverEnabled: config.pushoverEnabled ?? true,
+    fcmEnabled: config.fcmEnabled ?? false,
+  });
 }
 
-// POST /api/settings/pushover — { pushoverEnabled: boolean }
+// POST /api/settings/channels — { pushoverEnabled?, fcmEnabled? }
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (!isAdmin(session.user.email)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { pushoverEnabled } = await req.json() as { pushoverEnabled: boolean };
-  if (typeof pushoverEnabled !== 'boolean') {
-    return NextResponse.json({ error: 'pushoverEnabled must be boolean' }, { status: 400 });
-  }
+  const body = await req.json() as { pushoverEnabled?: boolean; fcmEnabled?: boolean };
 
   const config = await readPrefs();
-  config.pushoverEnabled = pushoverEnabled;
+  if (typeof body.pushoverEnabled === 'boolean') config.pushoverEnabled = body.pushoverEnabled;
+  if (typeof body.fcmEnabled === 'boolean') config.fcmEnabled = body.fcmEnabled;
   await writePrefs(config);
-  return NextResponse.json({ ok: true, pushoverEnabled });
+
+  return NextResponse.json({
+    ok: true,
+    pushoverEnabled: config.pushoverEnabled ?? true,
+    fcmEnabled: config.fcmEnabled ?? false,
+  });
 }

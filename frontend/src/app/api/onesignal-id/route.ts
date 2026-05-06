@@ -24,46 +24,39 @@ async function savePrefs(config: UserPrefsConfig): Promise<void> {
   );
 }
 
-// GET /api/fcm-token — returns { registered: boolean } for the signed-in user
+// GET /api/onesignal-id — returns { registered: boolean }
 export async function GET() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const email = session.user.email.toLowerCase();
   const config = await loadPrefs();
   const prefs = config.prefs.find(p => p.email.toLowerCase() === email);
-  const registered = (prefs?.fcmTokens?.length ?? 0) > 0;
+  const registered = (prefs?.oneSignalIds?.length ?? 0) > 0;
   return NextResponse.json({ registered });
 }
 
-// POST /api/fcm-token  { token: string }
-// Registers an FCM token for the signed-in user. Idempotent.
+// POST /api/onesignal-id  { id: string }
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { token } = await req.json() as { token?: string };
-  if (!token || typeof token !== 'string') {
-    return NextResponse.json({ error: 'token required' }, { status: 400 });
-  }
+  const { id } = await req.json() as { id?: string };
+  if (!id || typeof id !== 'string') return NextResponse.json({ error: 'id required' }, { status: 400 });
 
   const email = session.user.email.toLowerCase();
   const config = await loadPrefs();
-
   const idx = config.prefs.findIndex(p => p.email.toLowerCase() === email);
+
   if (idx >= 0) {
-    const existing = config.prefs[idx].fcmTokens ?? [];
-    if (!existing.includes(token)) {
-      config.prefs[idx].fcmTokens = [...existing, token].slice(-10); // keep max 10 tokens per user
+    const existing = config.prefs[idx].oneSignalIds ?? [];
+    if (!existing.includes(id)) {
+      config.prefs[idx].oneSignalIds = [...existing, id].slice(-10);
     }
   } else {
     config.prefs.push({
       email,
-      fcmTokens: [token],
+      oneSignalIds: [id],
       notifications: {
         homeworkDigest: true,
         homeworkStatusChange: true,
@@ -80,23 +73,19 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true });
 }
 
-// DELETE /api/fcm-token  { token: string }
-// Removes a stale or revoked FCM token.
+// DELETE /api/onesignal-id  { id: string }
 export async function DELETE(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { token } = await req.json() as { token?: string };
-  if (!token) return NextResponse.json({ error: 'token required' }, { status: 400 });
+  const { id } = await req.json() as { id?: string };
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
   const email = session.user.email.toLowerCase();
   const config = await loadPrefs();
-
   const idx = config.prefs.findIndex(p => p.email.toLowerCase() === email);
   if (idx >= 0) {
-    config.prefs[idx].fcmTokens = (config.prefs[idx].fcmTokens ?? []).filter(t => t !== token);
+    config.prefs[idx].oneSignalIds = (config.prefs[idx].oneSignalIds ?? []).filter(i => i !== id);
     await savePrefs(config);
   }
 

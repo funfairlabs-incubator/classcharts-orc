@@ -2,8 +2,7 @@
 import { useSession } from 'next-auth/react';
 import { useEffect, useRef, useState } from 'react';
 import { usePupil } from '@/lib/usePupil';
-import { getFirebaseMessaging } from '@/lib/firebase';
-import { getToken } from 'firebase/messaging';
+import { getOneSignal, getOneSignalUserId } from '@/lib/onesignal';
 
 interface NotificationPrefs {
   homeworkDigest: boolean;
@@ -53,7 +52,8 @@ export default function SettingsPage() {
   const [testing, setTesting] = useState<'idle'|'sending'|'ok'|'error'>('idle');
   const [notifStatus, setNotifStatus] = useState<'unknown'|'granted'|'denied'|'registering'|'registered'|'error'>('unknown');
   const [pushoverEnabled, setPushoverEnabled] = useState<boolean | null>(null);
-  const [pushoverSaving, setPushoverSaving] = useState(false);
+  const [fcmEnabled, setFcmEnabled] = useState<boolean | null>(null);
+  const [channelSaving, setChannelSaving] = useState<'pushover'|'fcm'|null>(null);
   const isAdmin = session?.user?.email?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN_EMAIL?.toLowerCase();
   const { pupils } = usePupil();
   const [palettes, setPalettes] = useState<Record<number, ReturnType<typeof paletteFromHex>>>({});
@@ -106,14 +106,17 @@ export default function SettingsPage() {
         setDemoColourState(parsed.color);
       }
     } catch { /* ignore */ }
-    // Admin: fetch pushover toggle state
-    fetch('/api/settings/pushover')
+    // Admin: fetch channel toggle states
+    fetch('/api/settings/channels')
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.pushoverEnabled !== undefined) setPushoverEnabled(d.pushoverEnabled); })
+      .then(d => {
+        if (d?.pushoverEnabled !== undefined) setPushoverEnabled(d.pushoverEnabled);
+        if (d?.fcmEnabled !== undefined) setFcmEnabled(d.fcmEnabled);
+      })
       .catch(() => {});
 
-    // Check if this device already has a token registered
-    fetch('/api/fcm-token')
+    // Check if this device already has a OneSignal ID registered
+    fetch('/api/onesignal-id')
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.registered) setNotifStatus('registered'); })
       .catch(() => {});
@@ -137,58 +140,50 @@ export default function SettingsPage() {
     setTimeout(() => setTesting('idle'), 4000);
   }
 
-  async function registerFcmToken() {
+  async function registerOneSignal() {
     setNotifStatus('registering');
     try {
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') { setNotifStatus('denied'); return; }
-      const messaging = getFirebaseMessaging();
-      if (!messaging) { console.error('FCM: getFirebaseMessaging() returned null'); setNotifStatus('error'); return; }
+      const os = await getOneSignal();
+      if (!os) { console.error('OneSignal: SDK not loaded'); setNotifStatus('error'); return; }
 
-      // Explicitly register the service worker — don't assume it's already registered
-      let swReg: ServiceWorkerRegistration | undefined;
-      try {
-        swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
-        await swReg.update();
-        console.log('FCM: service worker registered', swReg.scope);
-      } catch (swErr) {
-        console.error('FCM: service worker registration failed', swErr);
-        setNotifStatus('error');
-        return;
-      }
+      // Request permission and subscribe
+      await os.Notifications.requestPermission();
+      const permission = os.Notifications.permission;
+      if (!permission) { setNotifStatus('denied'); return; }
 
-      const token = await getToken(messaging, {
-        vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
-        serviceWorkerRegistration: swReg,
-      });
-      console.log('FCM: token obtained', token ? token.slice(0, 20) + '…' : 'null');
-      if (!token) { setNotifStatus('error'); return; }
-      const res = await fetch('/api/fcm-token', {
+      // Get the subscription ID
+      const id = await getOneSignalUserId();
+      console.log('OneSignal: subscription ID', id ? id.slice(0, 20) + '…' : 'null');
+      if (!id) { setNotifStatus('error'); return; }
+
+      const res = await fetch('/api/onesignal-id', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ id }),
       });
-      console.log('FCM: token saved', res.status);
+      console.log('OneSignal: ID saved', res.status);
       setNotifStatus(res.ok ? 'registered' : 'error');
     } catch (err) {
-      console.error('FCM registration failed:', err);
+      console.error('OneSignal registration failed:', err);
       setNotifStatus('error');
     }
   }
 
-  async function togglePushover(enabled: boolean) {
-    setPushoverSaving(true);
+  async function toggleChannel(channel: 'pushover' | 'fcm', enabled: boolean) {
+    setChannelSaving(channel);
     try {
-      await fetch('/api/settings/pushover', {
+      const res = await fetch('/api/settings/channels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pushoverEnabled: enabled }),
+        body: JSON.stringify(channel === 'pushover' ? { pushoverEnabled: enabled } : { fcmEnabled: enabled }),
       });
-      setPushoverEnabled(enabled);
+      const data = await res.json();
+      if (data.pushoverEnabled !== undefined) setPushoverEnabled(data.pushoverEnabled);
+      if (data.fcmEnabled !== undefined) setFcmEnabled(data.fcmEnabled);
     } catch (err) {
-      console.error('Failed to update Pushover setting:', err);
+      console.error(`Failed to update ${channel} setting:`, err);
     } finally {
-      setPushoverSaving(false);
+      setChannelSaving(null);
     }
   }
 
@@ -273,7 +268,7 @@ export default function SettingsPage() {
             background: notifStatus === 'registered' || notifStatus === 'granted' ? 'var(--positive-bg)' : notifStatus === 'error' || notifStatus === 'denied' ? 'var(--negative-bg)' : 'var(--surface-2)',
             color: notifStatus === 'registered' || notifStatus === 'granted' ? 'var(--positive)' : notifStatus === 'error' || notifStatus === 'denied' ? 'var(--negative)' : 'var(--text)',
           }}
-          onClick={registerFcmToken}
+          onClick={registerOneSignal}
           disabled={notifStatus === 'registering' || notifStatus === 'registered'}
         >
           {notifStatus === 'registering' ? 'Registering…' : notifStatus === 'registered' ? '✓ Notifications enabled' : notifStatus === 'granted' ? '✓ Already enabled — re-register' : notifStatus === 'denied' ? '✕ Blocked — check browser settings' : notifStatus === 'error' ? '✕ Failed — try again' : '🔔 Enable notifications on this device'}
@@ -407,31 +402,54 @@ export default function SettingsPage() {
       )}
 
       {/* System — admin only */}
-      {pushoverEnabled !== null && (
+      {(pushoverEnabled !== null || fcmEnabled !== null) && (
         <div className="card" style={styles.section}>
-          <h2 style={styles.sectionTitle}>System</h2>
+          <h2 style={styles.sectionTitle}>Notification Channels</h2>
           <p style={styles.sectionDesc}>Admin controls. Changes take effect on the next poll.</p>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingTop: 8 }}>
+
+          {/* Pushover */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingTop: 12 }}>
             <div>
-              <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>Pushover notifications</p>
+              <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>Pushover</p>
               <p style={{ fontSize: 12, color: 'var(--text-2)' }}>
-                {pushoverEnabled
-                  ? 'On — parallel run active, both Pushover and FCM fire'
-                  : 'Off — FCM only, Pushover disabled'}
+                {pushoverEnabled ? 'On — rich notifications via Pushover' : 'Off'}
               </p>
             </div>
             <button
               style={{
                 padding: '10px 18px', borderRadius: 6, border: '1px solid var(--border)',
-                fontSize: 13, fontWeight: 600, cursor: pushoverSaving ? 'default' : 'pointer',
+                fontSize: 13, fontWeight: 600, cursor: channelSaving === 'pushover' ? 'default' : 'pointer',
                 background: pushoverEnabled ? 'var(--positive-bg)' : 'var(--surface-2)',
                 color: pushoverEnabled ? 'var(--positive)' : 'var(--text-2)',
                 flexShrink: 0, minWidth: 80,
               }}
-              onClick={() => togglePushover(!pushoverEnabled)}
-              disabled={pushoverSaving}
+              onClick={() => toggleChannel('pushover', !pushoverEnabled)}
+              disabled={channelSaving === 'pushover'}
             >
-              {pushoverSaving ? '…' : pushoverEnabled ? 'On' : 'Off'}
+              {channelSaving === 'pushover' ? '…' : pushoverEnabled ? 'On' : 'Off'}
+            </button>
+          </div>
+
+          {/* FCM */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingTop: 16, marginTop: 12, borderTop: '1px solid var(--border)' }}>
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>OneSignal</p>
+              <p style={{ fontSize: 12, color: 'var(--text-2)' }}>
+                {fcmEnabled ? 'On — rich push to registered devices' : 'Off — enable once devices are registered'}
+              </p>
+            </div>
+            <button
+              style={{
+                padding: '10px 18px', borderRadius: 6, border: '1px solid var(--border)',
+                fontSize: 13, fontWeight: 600, cursor: channelSaving === 'fcm' ? 'default' : 'pointer',
+                background: fcmEnabled ? 'var(--positive-bg)' : 'var(--surface-2)',
+                color: fcmEnabled ? 'var(--positive)' : 'var(--text-2)',
+                flexShrink: 0, minWidth: 80,
+              }}
+              onClick={() => toggleChannel('fcm', !fcmEnabled)}
+              disabled={channelSaving === 'fcm'}
+            >
+              {channelSaving === 'fcm' ? '…' : fcmEnabled ? 'On' : 'Off'}
             </button>
           </div>
         </div>

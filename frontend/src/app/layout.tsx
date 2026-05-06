@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import './globals.css';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -34,6 +35,20 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en">
       <body>
+        <Script
+          src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"
+          strategy="afterInteractive"
+        />
+        <Script id="onesignal-init" strategy="afterInteractive">{`
+          window.OneSignalDeferred = window.OneSignalDeferred || [];
+          OneSignalDeferred.push(async function(OneSignal) {
+            await OneSignal.init({
+              appId: "${process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID}",
+              notifyButton: { enable: false },
+              promptOptions: { slidedown: { enabled: false } },
+            });
+          });
+        `}</Script>
         <SessionProvider session={session}>
           <AppShell session={session}>
             {children}
