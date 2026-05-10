@@ -9,6 +9,7 @@
     "backfill-attachments": "npx ts-node backfill-attachments.ts",
     "backfill-gcs-paths": "npx ts-node backfill-gcs-paths.ts",
     "backfill-homework-calendar": "npx ts-node backfill-homework-calendar.ts",
+    "backfill-homework-attachments": "npx ts-node backfill-homework-attachments.ts",
     "backfill-homework-tasks": "npx ts-node backfill-homework-tasks.ts"
   },
   "dependencies": {

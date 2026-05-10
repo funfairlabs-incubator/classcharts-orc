@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { Storage } from '@google-cloud/storage';
-import type { CCAnnouncement } from '@classcharts/shared';
+import type { CCAnnouncement, CCHomework } from '@classcharts/shared';
 
 const db = new Firestore({ projectId: process.env.GCP_PROJECT_ID });
 const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
@@ -178,4 +178,73 @@ function guessContentType(filename: string): string {
     gif: 'image/gif',
   };
   return map[ext] ?? 'application/octet-stream';
+}
+
+// ── Download & save homework attachments to GCS ───────────────
+
+export async function downloadHomeworkAttachments(
+  hw: CCHomework,
+  studentId: number,
+  authHeaders: Record<string, string>,
+): Promise<SavedAttachment[]> {
+  const saved: SavedAttachment[] = [];
+
+  for (const att of hw.attachments) {
+    const filename = att.fileName;
+    const gcsPath = `homework/${studentId}/${hw.id}/${filename}`;
+    const file = storage.bucket(BUCKET).file(gcsPath);
+
+    // Skip if already saved
+    const [exists] = await file.exists();
+    if (exists) {
+      console.log(`  Homework attachment already saved: ${gcsPath}`);
+      const [meta] = await file.getMetadata();
+      saved.push({
+        filename,
+        gcsPath,
+        originalUrl: att.url,
+        contentType: (meta.contentType as string) ?? 'application/octet-stream',
+        size: parseInt(meta.size as string) ?? 0,
+        savedAt: (meta.metadata as any)?.savedAt ?? new Date().toISOString(),
+      });
+      continue;
+    }
+
+    try {
+      const res = await fetch(att.url, { headers: authHeaders });
+      if (!res.ok) { console.warn(`  Failed to fetch homework attachment ${att.url}: ${res.status}`); continue; }
+      const buffer = Buffer.from(await res.arrayBuffer());
+      const contentType = res.headers.get('content-type') ?? 'application/octet-stream';
+      const savedAt = new Date().toISOString();
+
+      await file.save(buffer, {
+        metadata: { contentType, metadata: { savedAt, homeworkId: String(hw.id), studentId: String(studentId) } },
+      });
+
+      saved.push({ filename, gcsPath, originalUrl: att.url, contentType, size: buffer.length, savedAt });
+      console.log(`  Saved homework attachment: ${gcsPath} (${buffer.length} bytes)`);
+    } catch (err) {
+      console.error(`  Error saving homework attachment ${att.url}:`, err);
+    }
+  }
+
+  // Record to Firestore homeworkAttachments collection
+  if (saved.length > 0) {
+    const batch = db.batch();
+    for (const att of saved) {
+      const docId = `${studentId}_${hw.id}_${att.filename}`;
+      batch.set(db.collection('homeworkAttachments').doc(docId), {
+        ...att,
+        studentId,
+        homeworkId: hw.id,
+        homeworkTitle: hw.title,
+        homeworkSubject: hw.subject ?? '',
+        homeworkDueDate: hw.dueDate ?? '',
+        type: 'homework',
+      }, { merge: true });
+    }
+    await batch.commit();
+  }
+
+  return saved;
 }

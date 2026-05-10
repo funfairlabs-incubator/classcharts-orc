@@ -132,6 +132,15 @@ ${(err as any)?.stack ?? ''}`,
                   console.error(`  Task creation failed for homework ${hw.id}:`, taskErr);
                 }
               }
+
+              // Download homework attachments to GCS
+              if (hw.attachments.length > 0) {
+                try {
+                  await downloadHomeworkAttachments(hw, pupil.id, authHeaders);
+                } catch (attErr) {
+                  console.error(`  Homework attachment download failed for ${hw.id}:`, attErr);
+                }
+              }
             }
             state.lastHomeworkId = Math.max(...newHomeworks.map(h => h.id));
             changed = true;
