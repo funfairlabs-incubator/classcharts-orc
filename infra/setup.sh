@@ -147,6 +147,12 @@ gcloud firestore indexes composite create \
   --project="$PROJECT_ID" --quiet 2>/dev/null || echo "  announcements index already exists"
 
 gcloud firestore indexes composite create \
+  --collection-group=homeworkAttachments \
+  --field-config=field-path=studentId,order=ascending \
+  --field-config=field-path=homeworkDueDate,order=descending \
+  --project="$PROJECT_ID" --quiet 2>/dev/null || echo "  homeworkAttachments index already exists"
+
+gcloud firestore indexes composite create \
   --collection-group=attachments \
   --field-config=field-path=studentId,order=ascending \
   --field-config=field-path=announcementDate,order=descending \

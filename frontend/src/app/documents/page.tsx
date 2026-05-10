@@ -2,7 +2,7 @@
 import { usePupil } from '@/lib/usePupil';
 import { useEffect, useState } from 'react';
 
-interface Document {
+interface BaseDocument {
   filename: string;
   gcsPath: string;
   signedUrl: string | null;
@@ -11,12 +11,26 @@ interface Document {
   savedAt: string;
   studentId: number;
   studentName: string;
+}
+
+interface AnnouncementDocument extends BaseDocument {
+  type: 'announcement';
   announcementId: number;
   announcementTitle: string;
   announcementDate: string;
   teacherName: string;
   schoolName: string;
 }
+
+interface HomeworkDocument extends BaseDocument {
+  type: 'homework';
+  homeworkId: number;
+  homeworkTitle: string;
+  homeworkSubject: string;
+  homeworkDueDate: string;
+}
+
+type Document = AnnouncementDocument | HomeworkDocument;
 
 function fileIcon(contentType: string): string {
   if (contentType.includes('pdf')) return '📄';
@@ -37,21 +51,30 @@ function formatDate(ts: string) {
   return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function groupByAnnouncement(docs: Document[]): Map<string, Document[]> {
+function groupKey(doc: Document): string {
+  return doc.type === 'announcement'
+    ? `ann_${doc.studentId}_${doc.announcementId}`
+    : `hw_${doc.studentId}_${doc.homeworkId}`;
+}
+
+function groupDocuments(docs: Document[]): Map<string, Document[]> {
   const map = new Map<string, Document[]>();
   for (const doc of docs) {
-    const key = `${doc.studentId}_${doc.announcementId}`;
+    const key = groupKey(doc);
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(doc);
   }
   return map;
 }
 
+type FilterType = 'all' | 'announcement' | 'homework';
+
 export default function DocumentsPage() {
   const { pupils } = usePupil();
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<number | null>(null);
+  const [pupilFilter, setPupilFilter] = useState<number | null>(null);
+  const [typeFilter, setTypeFilter] = useState<FilterType>('all');
 
   const [savedPalettes, setSavedPalettes] = useState<Record<number, { color: string; bg: string; border: string }>>({});
   useEffect(() => {
@@ -70,14 +93,15 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     setLoading(true);
-    const params = filter ? `?pupilId=${filter}` : '';
+    const params = pupilFilter ? `?pupilId=${pupilFilter}` : '';
     fetch(`/api/documents${params}`)
       .then(r => r.json())
       .then(d => { setDocs(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [filter]);
+  }, [pupilFilter]);
 
-  const grouped = groupByAnnouncement(docs);
+  const filteredDocs = typeFilter === 'all' ? docs : docs.filter(d => d.type === typeFilter);
+  const grouped = groupDocuments(filteredDocs);
 
   return (
     <div style={styles.page}>
@@ -89,18 +113,30 @@ export default function DocumentsPage() {
       {/* Student filter pills */}
       {pupils.length > 1 && (
         <div style={styles.filterRow}>
-          <button onClick={() => setFilter(null)} style={{ ...styles.filterBtn, ...(filter === null ? styles.filterBtnActive : {}) }}>All</button>
-          {pupils.map((p, idx) => {
+          <button onClick={() => setPupilFilter(null)} style={{ ...styles.filterBtn, ...(pupilFilter === null ? styles.filterBtnActive : {}) }}>All</button>
+          {pupils.map(p => {
             const acc = accentFor(p.id);
             return (
-              <button key={p.id} onClick={() => setFilter(filter === p.id ? null : p.id)} style={{
+              <button key={p.id} onClick={() => setPupilFilter(pupilFilter === p.id ? null : p.id)} style={{
                 ...styles.filterBtn,
-                ...(filter === p.id ? { background: acc.bg, color: acc.color, borderColor: acc.color } : {}),
+                ...(pupilFilter === p.id ? { background: acc.bg, color: acc.color, borderColor: acc.color } : {}),
               }}>{p.firstName}</button>
             );
           })}
         </div>
       )}
+
+      {/* Type filter pills */}
+      <div style={{ ...styles.filterRow, marginBottom: 16 }}>
+        {(['all', 'announcement', 'homework'] as FilterType[]).map(t => (
+          <button key={t} onClick={() => setTypeFilter(t)} style={{
+            ...styles.filterBtn,
+            ...(typeFilter === t ? styles.filterBtnActive : {}),
+          }}>
+            {t === 'all' ? 'All' : t === 'announcement' ? '📢 Announcements' : '📚 Homework'}
+          </button>
+        ))}
+      </div>
 
       {loading && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -108,28 +144,33 @@ export default function DocumentsPage() {
         </div>
       )}
 
-      {!loading && docs.length === 0 && (
+      {!loading && grouped.size === 0 && (
         <div className="card" style={{ padding: 32, textAlign: 'center' }}>
           <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>No documents yet</p>
-          <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 }}>Attachments from school announcements will appear here once archived.</p>
+          <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 }}>
+            Attachments from school announcements and homework will appear here once archived.
+          </p>
         </div>
       )}
 
-      {!loading && docs.length > 0 && (
+      {!loading && grouped.size > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {Array.from(grouped.entries()).map(([groupKey, groupDocs]) => {
+          {Array.from(grouped.entries()).map(([key, groupDocs]) => {
             const first = groupDocs[0];
             const acc = accentFor(first.studentId);
             const pupilName = pupils.find(p => p.id === first.studentId)?.firstName ?? first.studentName;
+            const isHomework = first.type === 'homework';
+            const hw = isHomework ? first as HomeworkDocument : null;
+            const ann = !isHomework ? first as AnnouncementDocument : null;
 
             return (
-              <div key={groupKey} className="card" style={{ overflow: 'hidden' }}>
+              <div key={key} className="card" style={{ overflow: 'hidden' }}>
                 {/* Accent stripe */}
                 <div style={{ height: 3, background: acc.color }} />
 
                 <div style={{ padding: '12px 16px 0' }}>
-                  {/* Student pill + date */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  {/* Student pill + type pill + date */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
                     <span style={{
                       fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100,
                       background: acc.bg, color: acc.color, border: `1px solid ${acc.border}`,
@@ -137,15 +178,30 @@ export default function DocumentsPage() {
                     }}>
                       {pupilName}
                     </span>
-                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>
-                      {formatDate(first.announcementDate)}
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100,
+                      background: isHomework ? '#fef9c3' : '#f0f9ff',
+                      color: isHomework ? '#854d0e' : '#0369a1',
+                      border: `1px solid ${isHomework ? '#fde047' : '#7dd3fc'}`,
+                      fontFamily: 'var(--font-mono)',
+                    }}>
+                      {isHomework ? '📚 Homework' : '📢 Announcement'}
+                    </span>
+                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', marginLeft: 'auto' }}>
+                      {isHomework
+                        ? (hw!.homeworkDueDate ? `Due ${formatDate(hw!.homeworkDueDate)}` : '')
+                        : formatDate(ann!.announcementDate)}
                     </span>
                   </div>
 
-                  {/* Announcement title + teacher */}
-                  <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>{first.announcementTitle}</p>
+                  {/* Title + subtitle */}
+                  <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>
+                    {isHomework ? hw!.homeworkTitle : ann!.announcementTitle}
+                  </p>
                   <p style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', marginBottom: 10 }}>
-                    {first.teacherName} · {first.schoolName}
+                    {isHomework
+                      ? hw!.homeworkSubject
+                      : `${ann!.teacherName} · ${ann!.schoolName}`}
                   </p>
                 </div>
 
@@ -190,7 +246,7 @@ const styles: Record<string, React.CSSProperties> = {
   page: { maxWidth: 640, margin: '0 auto', padding: '12px 12px 56px' },
   eyebrow: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 2 },
   pageTitle: { fontSize: 22, fontWeight: 700 },
-  filterRow: { display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' as const },
+  filterRow: { display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' as const },
   filterBtn: { fontSize: 11, padding: '4px 12px', border: '1px solid var(--border)', borderRadius: 100, background: 'transparent', cursor: 'pointer', color: 'var(--text-2)', fontFamily: 'var(--font-body)' },
   filterBtnActive: { background: 'var(--surface-2)', color: 'var(--text)', borderColor: 'var(--text-2)', fontWeight: 600 },
 };

@@ -46,6 +46,11 @@ export interface CCBehaviourSummary {
   endDate: string;
 }
 
+export interface CCHomeworkAttachment {
+  fileName: string;
+  url: string;
+}
+
 export interface CCHomework {
   id: number;
   title: string;
