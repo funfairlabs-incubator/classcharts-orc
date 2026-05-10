@@ -16,6 +16,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 import { Storage } from '@google-cloud/storage';
 import { Firestore } from '@google-cloud/firestore';
+import { ParentClient } from 'classcharts-api';
 
 const DRY_RUN = !process.argv.includes('--go');
 const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
@@ -31,31 +32,54 @@ async function getAllowedUsers() {
 
 // ── ClassCharts client (inline to avoid circular deps) ────────
 
+function stripHtml(html: string): string {
+  return (html ?? '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').trim();
+}
+
 async function loginAndGetHomeworks(email: string, password: string): Promise<{
-  pupils: Array<{ id: number; name: string }>;
   homeworks: Array<{ pupilId: number; pupilName: string; hw: any }>;
   authHeaders: Record<string, string>;
 }> {
-  const { ClassChartsParentClient } = await import('../shared/src/classcharts.js' as any);
-  const client = new ClassChartsParentClient(email, password);
-  const pupils = await client.login();
-  const authHeaders = client.getAuthHeaders();
+  const client = new ParentClient(email, password);
+  await (client as any).login();
+
+  const c = client as any;
+  const authHeaders = {
+    Cookie: (c.authCookies ?? []).join(';'),
+    Authorization: `Basic ${c.sessionId ?? ''}`,
+  };
 
   const from = new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0];
   const to   = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
 
+  const rawPupils = c.pupils ?? [];
   const homeworks: Array<{ pupilId: number; pupilName: string; hw: any }> = [];
-  for (const pupil of pupils) {
-    client.selectPupil(pupil.id);
-    const hws = await client.getHomeworks(from, to);
-    for (const hw of hws) {
-      if (hw.attachments?.length > 0) {
-        homeworks.push({ pupilId: pupil.id, pupilName: pupil.name, hw });
+
+  for (const rawPupil of rawPupils) {
+    client.selectPupil(rawPupil.id);
+    const res = await client.getHomeworks({ from, to, displayDate: 'due_date' });
+    for (const h of res.data) {
+      const attachments = (h.validated_attachments ?? []).map((a: any) => ({
+        fileName: a.file_name,
+        url: a.validated_file,
+      }));
+      if (attachments.length > 0) {
+        homeworks.push({
+          pupilId: rawPupil.id,
+          pupilName: rawPupil.name,
+          hw: {
+            id: h.id,
+            title: h.title,
+            subject: h.subject,
+            dueDate: h.due_date,
+            attachments,
+          },
+        });
       }
     }
   }
 
-  return { pupils, homeworks, authHeaders };
+  return { homeworks, authHeaders };
 }
 
 async function fileExists(gcsPath: string): Promise<boolean> {
