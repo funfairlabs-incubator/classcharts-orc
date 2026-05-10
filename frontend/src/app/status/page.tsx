@@ -36,16 +36,16 @@ const DEPENDENCIES: Record<string, DependencyInfo> = {
   },
   firestore: {
     label: 'Firestore',
-    what: 'Poll state, announcement archive, attachment metadata, poller heartbeat',
+    what: 'Poll state, announcement archive, attachment metadata, homework attachment metadata, poller heartbeat',
     why: 'Required for all persistence. Without it the poller re-sends every notification on every poll and the frontend cannot show archived announcements or documents.',
     when: 'Read at poll start (state), written after every change. Frontend reads on every page load.',
-    with: 'Google Cloud Firestore via @google-cloud/firestore. Project: classcharts. Collections: poll_state, announcements, attachments, status.',
+    with: 'Google Cloud Firestore via @google-cloud/firestore. Project: classcharts. Collections: poll_state, announcements, attachments, homeworkAttachments, status.',
   },
   gcs: {
     label: 'Cloud Storage (GCS)',
     what: 'Attachment files (PDFs, converted docs), allowed-users.json, user-prefs.json',
-    why: 'Permanent storage for school documents. Without it attachments cannot be saved or served. Auth config cannot be read.',
-    when: 'Written when new attachments are downloaded. Read by frontend on Documents page and at auth time.',
+    why: 'Permanent storage for school documents (announcement and homework attachments). Without it attachments cannot be saved or served. Auth config cannot be read.',
+    when: 'Written when new announcement or homework attachments are downloaded. Read by frontend on Documents page and at auth time.',
     with: 'Google Cloud Storage via @google-cloud/storage. Bucket: classcharts-attachments. LibreOffice used for docx/pptx/xlsx → PDF conversion before upload.',
   },
   pubsub: {
