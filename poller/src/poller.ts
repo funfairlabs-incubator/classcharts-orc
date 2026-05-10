@@ -7,7 +7,7 @@ import { analyseAnnouncement, summariseHomework, summariseActivity } from './cla
 import { ensureCalendarsExist, createCalendarEvents, updateCalendarEventTitles } from './calendar.js';
 import { ensureTaskListsExist, createHomeworkTask, updateHomeworkTaskStatus, type HomeworkStatus } from './tasks.js';
 import { getEnabledKeys, getEnabledFcmTokens, getEnabledOneSignalIds } from './prefs.js';
-import { archiveAnnouncement, downloadAndSaveAttachments } from './archive.js';
+import { archiveAnnouncement, downloadAndSaveAttachments, downloadHomeworkAttachments } from './archive.js';
 
 export async function pollClassCharts(): Promise<void> {
   const from = daysAgoStr(30);
@@ -43,6 +43,7 @@ ${(err as any)?.stack ?? ''}`,
   for (const { client, pupils } of parents) {
     for (const pupil of pupils) {
       client.selectPupil(pupil.id);
+      const authHeaders = client.getAuthHeaders();
       const state = await getState(pupil.id);
       let changed = false;
       console.log(`Polling ${pupil.name} (${pupil.id})...`);
@@ -234,7 +235,6 @@ ${(err as any)?.stack ?? ''}`,
             const fcmTokens = await getEnabledFcmTokens('announcements');
             const oneSignalIds = await getEnabledOneSignalIds('announcements');
             console.log(`  New announcements: ${newAnnouncements.length}, pushover keys: ${keys.length}, fcm tokens: ${fcmTokens.length}`);
-            const authHeaders = client.getAuthHeaders();
             for (const ann of newAnnouncements) {
               // Archive to Firestore + download attachments to GCS
               await archiveAnnouncement(ann, pupil.id, pupil.name);
