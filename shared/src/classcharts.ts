@@ -98,9 +98,9 @@ function mapHomework(h: Homework): CCHomework {
     status: h.status.state ?? null,
     ticked: h.status.ticked === 'yes',
     hasAttachments: (h.status.attachments?.length ?? 0) > 0 || (h.validated_attachments?.length ?? 0) > 0,
-    attachments: (h.validated_attachments ?? []).map(a => ({
-      fileName: a.file_name,
-      url: a.validated_file,
+    attachments: (h.validated_attachments ?? []).map((a: any) => ({
+      fileName: a.filename ?? a.file_name,  // raw API returns 'filename', SDK may return 'file_name'
+      url: a.file ?? a.validated_file,      // raw API returns 'file', SDK may return 'validated_file'
     })),
     links: (h.validated_links ?? []).map(l => ({ link: l.validated_link })),
     completionTime,
