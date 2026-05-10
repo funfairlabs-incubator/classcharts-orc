@@ -40,19 +40,52 @@ async function loginAndGetHomeworks(email: string, password: string): Promise<{
   homeworks: Array<{ pupilId: number; pupilName: string; hw: any }>;
   authHeaders: Record<string, string>;
 }> {
-  const client = new ParentClient(email, password);
-  await (client as any).login();
+  // Use the same TES SSO flow as the poller
+  const formData = new URLSearchParams({
+    _method: 'POST', email, logintype: 'existing', password,
+    'recaptcha-token': 'no-token-available',
+  });
+  const loginRes = await fetch('https://www.classcharts.com/parent/login', {
+    method: 'POST', body: formData,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    redirect: 'manual',
+  });
+  if (loginRes.status !== 302) throw new Error(`ClassCharts login failed: ${loginRes.status}`);
+  const setCookie = loginRes.headers.get('set-cookie') ?? '';
+  const ccSession = setCookie.match(/cc-session=([^;]+)/)?.[1];
+  const credMatch = setCookie.match(/parent_session_credentials=([^;\s]+)/)?.[1];
+  if (!ccSession || !credMatch) throw new Error('ClassCharts login: missing session cookies');
+  const sessionId = JSON.parse(decodeURIComponent(credMatch)).session_id as string;
+  const cookieHeader = \`cc-session=\${ccSession}; parent_session_credentials=\${credMatch}\`;
 
-  const c = client as any;
-  const authHeaders = {
-    Cookie: (c.authCookies ?? []).join(';'),
-    Authorization: `Basic ${c.sessionId ?? ''}`,
-  };
+  // TES verify
+  const tesRes = await fetch(
+    'https://session.tes.com/v1/verify?returnUrl=https%3A%2F%2Fwww.classcharts.com%2Fapiv2parent%2Fpupils',
+    { headers: { Cookie: cookieHeader }, redirect: 'manual' }
+  );
+  const tesLocation = tesRes.headers.get('location');
+  if (tesLocation) await fetch(tesLocation, { headers: { Cookie: cookieHeader }, redirect: 'manual' });
+
+  const authHeaders = { Cookie: cookieHeader, Authorization: \`Basic \${sessionId}\` };
+
+  // Get pupils
+  const pupilsRes = await fetch('https://www.classcharts.com/apiv2parent/pupils', {
+    headers: { ...authHeaders, 'User-Agent': 'classcharts-api' }, redirect: 'manual',
+  });
+  if (pupilsRes.status !== 200) throw new Error(\`getPupils failed: \${pupilsRes.status}\`);
+  const { data: rawPupils } = await pupilsRes.json() as { data: any[] };
 
   const from = new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0];
   const to   = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
 
-  const rawPupils = c.pupils ?? [];
+  const client = new ParentClient(email, password);
+  const c = client as any;
+  c.sessionId = sessionId;
+  c.authCookies = cookieHeader.split('; ');
+  c.lastPing = Date.now();
+  c.pupils = rawPupils;
+  c.studentId = rawPupils[0]?.id ?? 0;
+
   const homeworks: Array<{ pupilId: number; pupilName: string; hw: any }> = [];
 
   for (const rawPupil of rawPupils) {
@@ -67,13 +100,7 @@ async function loginAndGetHomeworks(email: string, password: string): Promise<{
         homeworks.push({
           pupilId: rawPupil.id,
           pupilName: rawPupil.name,
-          hw: {
-            id: h.id,
-            title: h.title,
-            subject: h.subject,
-            dueDate: h.due_date,
-            attachments,
-          },
+          hw: { id: h.id, title: h.title, subject: h.subject, dueDate: h.due_date, attachments },
         });
       }
     }
