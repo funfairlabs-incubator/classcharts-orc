@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     if (parsedHomeworkId) hwQuery = hwQuery.where('homeworkId', '==', parsedHomeworkId);
 
     const [annSnap, hwSnap] = await Promise.all([
-      parsedHomeworkId ? Promise.resolve({ docs: [] } as any) : annQuery.get(),
+      parsedHomeworkId ? Promise.resolve({ docs: [] as FirebaseFirestore.QueryDocumentSnapshot[] }) : annQuery.get(),
       hwQuery.get(),
     ]);
 
