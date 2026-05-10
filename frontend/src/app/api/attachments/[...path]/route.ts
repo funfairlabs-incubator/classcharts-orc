@@ -11,8 +11,9 @@ export async function GET(req: NextRequest, { params }: { params: { path: string
 
   const gcsPath = params.path.join('/');
 
-  // Security: prevent path traversal — all attachments must be under attachments/
-  if (!gcsPath.startsWith('attachments/') || gcsPath.includes('..')) {
+  // Security: prevent path traversal — only allow known attachment prefixes
+  const allowedPrefixes = ['attachments/', 'homework/'];
+  if (!allowedPrefixes.some(p => gcsPath.startsWith(p)) || gcsPath.includes('..')) {
     return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
   }
 
