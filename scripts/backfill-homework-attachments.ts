@@ -16,9 +16,15 @@ const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
 const db = new Firestore({ projectId: process.env.GCP_PROJECT_ID });
 const BUCKET = process.env.GCS_BUCKET!;
 
-async function getAllowedUsers() {
-  const [c] = await storage.bucket(BUCKET).file('config/allowed-users.json').download();
-  return JSON.parse(c.toString()).users as Array<{ email: string; password: string; name: string }>;
+function getAllowedUsers(): Array<{ email: string; password: string; name: string }> {
+  const users = [];
+  for (let i = 1; i <= 5; i++) {
+    const email = process.env[`CLASSCHARTS_PARENT${i}_EMAIL`];
+    const password = process.env[`CLASSCHARTS_PARENT${i}_PASSWORD`];
+    if (email && password) users.push({ email, password, name: `Parent ${i}` });
+  }
+  if (users.length === 0) throw new Error('No CLASSCHARTS_PARENT1_EMAIL/PASSWORD in .env');
+  return users;
 }
 
 async function tesLogin(email: string, password: string) {
@@ -84,7 +90,7 @@ async function saveAttachment(att: { fileName: string; url: string }, hw: any, s
 
 async function main() {
   console.log(`\n🔍 Backfill homework attachments${DRY_RUN ? ' [DRY RUN — pass --go to apply]' : ''}\n`);
-  const users = await getAllowedUsers();
+  const users = getAllowedUsers();
   console.log(`Found ${users.length} user(s)\n`);
   let totalHw = 0, totalAtt = 0;
   for (const user of users) {
