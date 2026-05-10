@@ -1,6 +1,7 @@
 'use client';
 import { usePupil } from '@/lib/usePupil';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 interface BaseDocument {
   filename: string;
@@ -71,10 +72,12 @@ type FilterType = 'all' | 'announcement' | 'homework';
 
 export default function DocumentsPage() {
   const { pupils } = usePupil();
+  const searchParams = useSearchParams();
+  const homeworkId = searchParams.get('homeworkId');
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [pupilFilter, setPupilFilter] = useState<number | null>(null);
-  const [typeFilter, setTypeFilter] = useState<FilterType>('all');
+  const [typeFilter, setTypeFilter] = useState<FilterType>(homeworkId ? 'homework' : 'all');
 
   const [savedPalettes, setSavedPalettes] = useState<Record<number, { color: string; bg: string; border: string }>>({});
   useEffect(() => {
@@ -93,12 +96,15 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     setLoading(true);
-    const params = pupilFilter ? `?pupilId=${pupilFilter}` : '';
+    const p = new URLSearchParams();
+    if (pupilFilter) p.set('pupilId', String(pupilFilter));
+    if (homeworkId) p.set('homeworkId', homeworkId);
+    const params = p.toString() ? `?${p.toString()}` : '';
     fetch(`/api/documents${params}`)
       .then(r => r.json())
       .then(d => { setDocs(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [pupilFilter]);
+  }, [pupilFilter, homeworkId]);
 
   const filteredDocs = typeFilter === 'all' ? docs : docs.filter(d => d.type === typeFilter);
   const grouped = groupDocuments(filteredDocs);
@@ -109,6 +115,14 @@ export default function DocumentsPage() {
         <p style={styles.eyebrow}>School</p>
         <h1 style={styles.pageTitle}>Documents</h1>
       </div>
+
+      {/* Context banner when deep-linked from homework */}
+      {homeworkId && (
+        <div style={{ marginBottom: 12, padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 6, fontSize: 12, color: 'var(--text-2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>📚 Showing documents for this homework</span>
+          <a href="/documents" style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', textDecoration: 'none' }}>View all →</a>
+        </div>
+      )}
 
       {/* Student filter pills */}
       {pupils.length > 1 && (

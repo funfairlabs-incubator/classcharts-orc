@@ -26,6 +26,8 @@ export async function GET(req: NextRequest) {
 
   const pupilId = req.nextUrl.searchParams.get('pupilId');
   const parsedPupilId = pupilId ? parseInt(pupilId) : null;
+  const homeworkId = req.nextUrl.searchParams.get('homeworkId');
+  const parsedHomeworkId = homeworkId ? parseInt(homeworkId) : null;
 
   try {
     // ── Announcement attachments ───────────────────────────────
@@ -39,8 +41,12 @@ export async function GET(req: NextRequest) {
       .orderBy('homeworkDueDate', 'desc')
       .limit(200) as FirebaseFirestore.Query;
     if (parsedPupilId) hwQuery = hwQuery.where('studentId', '==', parsedPupilId);
+    if (parsedHomeworkId) hwQuery = hwQuery.where('homeworkId', '==', parsedHomeworkId);
 
-    const [annSnap, hwSnap] = await Promise.all([annQuery.get(), hwQuery.get()]);
+    const [annSnap, hwSnap] = await Promise.all([
+      parsedHomeworkId ? Promise.resolve({ docs: [] } as any) : annQuery.get(),
+      hwQuery.get(),
+    ]);
 
     const annDocs = annSnap.docs.map(d => ({ ...d.data(), type: 'announcement' as const }));
     const hwDocs  = hwSnap.docs.map(d => ({ ...d.data(), type: 'homework' as const }));
