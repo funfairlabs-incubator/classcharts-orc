@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { usePupil, useClassChartsData } from '@/lib/usePupil';
 import type { CCHomework } from '@classcharts/shared';
 import { useState, useEffect, useMemo } from 'react';
@@ -272,6 +273,17 @@ export default function HomeworkPage() {
                   <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 2 }}>{hw.title}</p>
                   {hw.description && <p style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.4 }}>{hw.description}</p>}
                   {hw.completionTime && <p style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>⏱ {hw.completionTime}</p>}
+                  {hw.hasAttachments && (
+                    <Link href={`/documents?homeworkId=${hw.id}`} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6,
+                      fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600,
+                      color: acc.color, textDecoration: 'none',
+                      padding: '4px 10px', borderRadius: 4,
+                      border: `1px solid ${acc.border}`, background: acc.bg,
+                    }}>
+                      📎 Documents
+                    </Link>
+                  )}
                 </div>
               </div>
             );
