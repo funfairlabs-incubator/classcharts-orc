@@ -39,7 +39,7 @@ const DEPENDENCIES: Record<string, DependencyInfo> = {
     what: 'Poll state, announcement archive, attachment metadata, homework attachment metadata, poller heartbeat',
     why: 'Required for all persistence. Without it the poller re-sends every notification on every poll and the frontend cannot show archived announcements or documents.',
     when: 'Read at poll start (state), written after every change. Frontend reads on every page load.',
-    with: 'Google Cloud Firestore via @google-cloud/firestore. Project: classcharts. Collections: poll_state, announcements, attachments, homeworkAttachments, status.',
+    with: 'Google Cloud Firestore via @google-cloud/firestore. Project: classcharts. Collections: poll_state, announcements, attachments, homeworkAttachments, status. homeworkAttachments indexed by studentId+homeworkDueDate for Documents page queries.',
   },
   gcs: {
     label: 'Cloud Storage (GCS)',

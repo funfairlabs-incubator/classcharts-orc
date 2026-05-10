@@ -37,11 +37,11 @@ export async function GET(req: NextRequest) {
     if (parsedPupilId) annQuery = annQuery.where('studentId', '==', parsedPupilId);
 
     // ── Homework attachments ───────────────────────────────────
-    let hwQuery = db.collection('homeworkAttachments')
-      .orderBy('homeworkDueDate', 'desc')
-      .limit(200) as FirebaseFirestore.Query;
-    if (parsedPupilId) hwQuery = hwQuery.where('studentId', '==', parsedPupilId);
-    if (parsedHomeworkId) hwQuery = hwQuery.where('homeworkId', '==', parsedHomeworkId);
+    let hwQuery: FirebaseFirestore.Query = parsedHomeworkId
+      // When filtering by homeworkId, skip orderBy to avoid needing a composite index
+      ? db.collection('homeworkAttachments').where('homeworkId', '==', parsedHomeworkId)
+      : db.collection('homeworkAttachments').orderBy('homeworkDueDate', 'desc').limit(200);
+    if (!parsedHomeworkId && parsedPupilId) hwQuery = hwQuery.where('studentId', '==', parsedPupilId);
 
     const [annSnap, hwSnap] = await Promise.all([
       parsedHomeworkId ? Promise.resolve({ docs: [] as FirebaseFirestore.QueryDocumentSnapshot[] }) : annQuery.get(),
