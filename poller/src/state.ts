@@ -55,3 +55,23 @@ export async function readHeartbeat(): Promise<PollerHeartbeat | null> {
   const doc = await db.collection('status').doc('poller').get();
   return doc.exists ? (doc.data() as PollerHeartbeat) : null;
 }
+
+// ── Subject map (GCS) ─────────────────────────────────────────
+
+const SUBJECT_MAP_PATH = 'config/subject-map.json';
+
+export async function loadSubjectMap(): Promise<Record<string, string>> {
+  try {
+    const [data] = await storage.bucket(BUCKET).file(SUBJECT_MAP_PATH).download();
+    return JSON.parse(data.toString());
+  } catch {
+    return {};
+  }
+}
+
+export async function saveSubjectMap(map: Record<string, string>): Promise<void> {
+  await storage.bucket(BUCKET).file(SUBJECT_MAP_PATH).save(
+    JSON.stringify(map, null, 2),
+    { contentType: 'application/json' },
+  );
+}

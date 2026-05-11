@@ -56,6 +56,10 @@ export default function HomeworkPage() {
   const [savedPalettes, setSavedPalettes] = useState<Record<number, { color: string; bg: string; border: string }>>({});
   useEffect(() => {
     try { const p = localStorage.getItem('pupilPalettes'); if (p) setSavedPalettes(JSON.parse(p)); } catch { /* ignore */ }
+    fetch('/api/subject-map')
+      .then(r => r.ok ? r.json() : {})
+      .then(m => setSubjectMap(m))
+      .catch(() => {});
   }, []);
 
   const DEFAULT_ACCENTS = [
@@ -100,17 +104,26 @@ export default function HomeworkPage() {
   // Filter state
   const [filterStudent, setFilterStudent] = useState<number | 'all'>('all');
   const [filterSubject, setFilterSubject] = useState<string>('all');
+  const [subjectMap, setSubjectMap] = useState<Record<string, string>>({});
   const [filterStatus, setFilterStatus] = useState<StatusKey | 'all'>('all');
 
+  function resolveSubject(hw: { subject: string; lesson: string }): string {
+    if (hw.subject) return hw.subject;
+    const parts = hw.lesson?.split('/');
+    const code = parts?.[parts.length - 1]?.trim();
+    if (!code) return hw.lesson ?? '';
+    return subjectMap[code] ?? hw.lesson ?? '';
+  }
+
   const subjects = useMemo(() => {
-    const s = new Set(all.map(h => h.subject || h.lesson).filter(Boolean));
+    const s = new Set(all.map(h => resolveSubject(h)).filter(Boolean));
     return [...s].sort();
   }, [all]);
 
   const filtered = useMemo(() => {
     return all
       .filter(h => filterStudent === 'all' || h.pupilId === filterStudent)
-      .filter(h => filterSubject === 'all' || (h.subject || h.lesson) === filterSubject)
+      .filter(h => filterSubject === 'all' || resolveSubject(h) === filterSubject)
       .filter(h => filterStatus === 'all' || hwStatus(h) === filterStatus)
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   }, [all, filterStudent, filterSubject, filterStatus]);
@@ -263,7 +276,7 @@ export default function HomeworkPage() {
                       </span>
                     )}
                     {/* Subject */}
-                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{hw.subject || hw.lesson}</span>
+                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{resolveSubject(hw)}</span>
                     {isNew(hw) && <span style={styles.newBadge}>NEW</span>}
                     {/* Due date right */}
                     <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: 'var(--font-mono)', color: urgency === 'var(--border)' ? 'var(--text-3)' : urgency, fontWeight: status !== 'completed' && daysLeft <= 3 ? 600 : 400, flexShrink: 0 }}>
