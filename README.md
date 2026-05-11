@@ -171,10 +171,36 @@ App Engine (nodejs22, F1 instance)
 
 ### Known GCP Gotchas
 
+<<<<<<< dev
 - **Pub/Sub IAM drops on redeploy** — `deploy-poller.sh` re-grants `roles/run.invoker` automatically
 - **No `getSignedUrl` on App Engine SA** — proxy streams directly from GCS
 - **`NEXT_PUBLIC_*` needs build-time injection** — App Engine `env_variables` are server-only; deploy script writes `.env.production`
 - **Firebase project ID ≠ GCP project ID** — `classcharts-5bf9a` (Firebase) vs `classcharts` (GCP)
+=======
+- **Pub/Sub IAM drops on redeploy** — `roles/run.invoker` on `classcharts-poller-sa` must be re-granted after every `gcloud run deploy`. `infra/deploy-poller.sh` does this automatically.
+- **No `getSignedUrl` on App Engine SA** — attachment proxy streams directly from GCS instead.
+- **`NEXTAUTH_URL` must be in generated `app.yaml`** — App Engine does not read `.env`.
+- **GitHub Actions cannot stream Cloud Build logs** — the deploy still succeeds; add `roles/logging.viewer` to `github-actions` SA to fix.
+
+---
+
+## Pushover → FCM Transition
+
+Push notifications are migrating from Pushover to Firebase Cloud Messaging (FCM). During the transition both channels run in parallel.
+
+**To add new secrets (one-time setup):**
+1. Get Firebase config from [Firebase Console → Project Settings → General → Your apps](https://console.firebase.google.com)
+2. Get VAPID key from Firebase Console → Cloud Messaging → Web Push certificates → Generate key pair
+3. Add values to your local `.env` file
+4. Run `cd infra && ./load-secrets.sh ../.env` to push to Secret Manager
+5. Merge the PR — GitHub Actions deploys both poller and frontend
+
+**FCM token registration:**  
+Each parent visits `/settings` and taps **Enable notifications on this device**. This registers an FCM token stored per-user in `config/user-prefs.json` in GCS.
+
+**Cutover:**  
+After a week of parallel running, set `PUSHOVER_ENABLED=false` in Secret Manager (no redeploy needed — poller reads it at runtime). The Pushover dependency will show as `–` (disabled) on the status page rather than red. Then remove `PUSHOVER_API_TOKEN` and `PUSHOVER_USER_KEY` secrets on the next PR.
+>>>>>>> main
 
 ---
 

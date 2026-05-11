@@ -40,7 +40,7 @@ export async function saveGmailState(lastEmailId: string): Promise<void> {
 export interface PollerHeartbeat {
   polledAt: string;
   pupils: string[];
-  dependencies: Record<string, 'ok' | 'error'>;
+  dependencies: Record<string, 'ok' | 'error' | 'disabled'>;
   errors?: string[];
 }
 
