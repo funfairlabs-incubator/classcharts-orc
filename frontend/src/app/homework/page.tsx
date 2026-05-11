@@ -103,14 +103,14 @@ export default function HomeworkPage() {
   const [filterStatus, setFilterStatus] = useState<StatusKey | 'all'>('all');
 
   const subjects = useMemo(() => {
-    const s = new Set(all.map(h => h.subject).filter(Boolean));
+    const s = new Set(all.map(h => h.subject || h.lesson).filter(Boolean));
     return [...s].sort();
   }, [all]);
 
   const filtered = useMemo(() => {
     return all
       .filter(h => filterStudent === 'all' || h.pupilId === filterStudent)
-      .filter(h => filterSubject === 'all' || h.subject === filterSubject)
+      .filter(h => filterSubject === 'all' || (h.subject || h.lesson) === filterSubject)
       .filter(h => filterStatus === 'all' || hwStatus(h) === filterStatus)
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   }, [all, filterStudent, filterSubject, filterStatus]);
@@ -263,7 +263,7 @@ export default function HomeworkPage() {
                       </span>
                     )}
                     {/* Subject */}
-                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{hw.subject}</span>
+                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{hw.subject || hw.lesson}</span>
                     {isNew(hw) && <span style={styles.newBadge}>NEW</span>}
                     {/* Due date right */}
                     <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: 'var(--font-mono)', color: urgency === 'var(--border)' ? 'var(--text-3)' : urgency, fontWeight: status !== 'completed' && daysLeft <= 3 ? 600 : 400, flexShrink: 0 }}>
