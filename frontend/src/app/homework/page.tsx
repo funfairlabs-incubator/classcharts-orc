@@ -142,7 +142,7 @@ export default function HomeworkPage() {
   }
 
   const subjects = useMemo(() => {
-    const s = new Set(all.map(h => resolveSubject(h)).filter(Boolean));
+    const s = new Set(all.map(h => resolveSubject(h)).filter(s => Boolean(s) && s !== 'General'));
     return [...s].sort();
   }, [all]);
 
