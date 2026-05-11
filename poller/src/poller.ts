@@ -330,6 +330,7 @@ ${(err as any)?.stack ?? ''}`,
   }
 
   // Write heartbeat to Firestore so status page can show last successful poll
+  const channelConfig = await getAllPrefs();
   try {
   await writeHeartbeat({
     polledAt: new Date().toISOString(),
@@ -337,11 +338,11 @@ ${(err as any)?.stack ?? ''}`,
     dependencies: {
       classcharts:    pollErrors.some(e => e.includes('login') || e.includes('TES') || e.includes('401') || e.includes('403')) ? 'error' : 'ok',
       firestore:      pollErrors.some(e => e.includes('Firestore') || e.includes('firestore')) ? 'error' : 'ok',
-      gcs:            pollErrors.some(e => e.includes('Storage') || e.includes('GCS') || e.includes('bucket') || e.includes('attachment')) ? 'error' : 'ok',
+      gcs:            pollErrors.some(e => e.includes('Storage') || e.includes('GCS') || e.includes('bucket') || e.includes('attachment') || e.includes('subject map')) ? 'error' : 'ok',
       pubsub:         'ok', // If poller ran, Pub/Sub delivered successfully
       anthropic:      pollErrors.some(e => e.includes('Anthropic') || e.includes('claude') || e.includes('summarise')) ? 'error' : 'ok',
-      fcm:            pollErrors.some(e => e.includes('FCM') || e.includes('firebase') || e.includes('messaging')) ? 'error' : 'ok',
-      pushover:       process.env.PUSHOVER_ENABLED !== 'false' ? (pollErrors.some(e => e.includes('Pushover') || e.includes('pushover')) ? 'error' : 'ok') : 'disabled',
+      onesignal:      pollErrors.some(e => e.includes('OneSignal') || e.includes('onesignal')) ? 'error' : 'ok',
+      pushover:       (channelConfig.pushoverEnabled ?? true) ? (pollErrors.some(e => e.includes('Pushover') || e.includes('pushover')) ? 'error' : 'ok') : 'disabled',
       gcal:           pollErrors.some(e => e.includes('Calendar') || e.includes('calendar') || e.includes('calendarConfig')) ? 'error' : 'ok',
       gtasks:         pollErrors.some(e => e.includes('Task') || e.includes('task') || e.includes('tasksConfig')) ? 'error' : 'ok',
       secretmanager:  'ok', // If poller started, secrets were read successfully
