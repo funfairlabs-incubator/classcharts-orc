@@ -107,7 +107,7 @@ export default function HomeworkPage() {
   const [subjectMap, setSubjectMap] = useState<Record<string, string>>({});
   const [filterStatus, setFilterStatus] = useState<StatusKey | 'all'>('all');
 
-  function resolveSubject(hw: { subject: string; lesson: string; title?: string }): string {
+  function resolveSubject(hw: { subject: string; lesson: string; title?: string; description?: string }): string {
     if (hw.subject) return hw.subject;
 
     // Try lesson code (e.g. "8b/Ma2" → "Ma2" → "Mathematics")
@@ -116,7 +116,7 @@ export default function HomeworkPage() {
     if (code && subjectMap[code]) return subjectMap[code];
 
     // Fallback: scan title for known subject keywords
-    const title = (hw.title ?? '').toLowerCase();
+    const title = ((hw.title ?? '') + ' ' + (hw.description ?? '')).toLowerCase();
     const titleMap: [string, string][] = [
       ['maths', 'Mathematics'], ['math', 'Mathematics'],
       ['english', 'English'], ['science', 'Science'],
