@@ -70,13 +70,20 @@ const DEPENDENCIES: Record<string, DependencyInfo> = {
     with: 'claude-sonnet-4-6 via https://api.anthropic.com/v1/messages. API key from Secret Manager. Rate limit: ~65s inter-topic delay for bulk operations.',
     degradesGracefully: true,
   },
-  fcm: {
+  onesignal: {
     label: 'OneSignal',
     what: 'Push notifications to parents for new homework, behaviour, announcements, attendance alerts',
     why: 'Rich web push notifications to installed PWAs. Both OneSignal and Pushover can run in parallel; each toggled independently from Settings → Notification Channels (admin only). Defaults: both on. Degrades gracefully — data is still archived if OneSignal fails.',
     when: 'Called for each new event detected by the poller.',
     with: 'OneSignal REST API v1 /notifications. Subscription IDs registered per-device via /settings → Enable notifications, stored in GCS user-prefs.json. If red: check ONESIGNAL_API_KEY and ONESIGNAL_APP_ID in Secret Manager, verify users have visited /settings and registered their device.',
     degradesGracefully: true,
+  },
+  pushover: {
+    label: 'Pushover',
+    what: 'Optional fallback push notification channel',
+    why: 'Secondary notification channel. Can be disabled once OneSignal is validated. Shows as disabled when turned off in Settings → Notification Channels.',
+    with: 'Pushover REST API. Controlled by pushoverEnabled flag in GCS user-prefs.json. If disabled, shows as – rather than red.',
+    when: 'Fires on same events as OneSignal when enabled.',
   },
   gcal: {
     label: 'Google Calendar',
