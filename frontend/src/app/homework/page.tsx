@@ -107,12 +107,37 @@ export default function HomeworkPage() {
   const [subjectMap, setSubjectMap] = useState<Record<string, string>>({});
   const [filterStatus, setFilterStatus] = useState<StatusKey | 'all'>('all');
 
-  function resolveSubject(hw: { subject: string; lesson: string }): string {
+  function resolveSubject(hw: { subject: string; lesson: string; title?: string }): string {
     if (hw.subject) return hw.subject;
+
+    // Try lesson code (e.g. "8b/Ma2" → "Ma2" → "Mathematics")
     const parts = hw.lesson?.split('/');
     const code = parts?.[parts.length - 1]?.trim();
-    if (!code) return hw.lesson ?? '';
-    return subjectMap[code] ?? hw.lesson ?? '';
+    if (code && subjectMap[code]) return subjectMap[code];
+
+    // Fallback: scan title for known subject keywords
+    const title = (hw.title ?? '').toLowerCase();
+    const titleMap: [string, string][] = [
+      ['maths', 'Mathematics'], ['math', 'Mathematics'],
+      ['english', 'English'], ['science', 'Science'],
+      ['history', 'History'], ['geography', 'Geography'],
+      ['french', 'French'], ['spanish', 'Spanish'],
+      ['german', 'German'], ['music', 'Music'],
+      ['art', 'Art'], ['drama', 'Drama'],
+      ['pe ', 'PE'], ['p.e', 'PE'], ['sport', 'PE'],
+      ['computing', 'Computing'], ['i.t', 'Computing'], [' it ', 'Computing'],
+      ['design', 'Design Technology'], ['d&t', 'Design Technology'],
+      ['r.e', 'RE'], [' re ', 'RE'], ['religious', 'RE'],
+      ['business', 'Business'], ['economics', 'Economics'],
+      ['psychology', 'Psychology'], ['sociology', 'Sociology'],
+      ['biology', 'Biology'], ['chemistry', 'Chemistry'], ['physics', 'Physics'],
+    ];
+    for (const [keyword, subject] of titleMap) {
+      if (title.includes(keyword)) return subject;
+    }
+
+    // Last resort: return lesson string or empty
+    return hw.lesson || '';
   }
 
   const subjects = useMemo(() => {
