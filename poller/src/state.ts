@@ -1,5 +1,9 @@
 import { Firestore } from '@google-cloud/firestore';
+import { Storage } from '@google-cloud/storage';
 import type { PollState } from '@classcharts/shared';
+
+const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
+const BUCKET = process.env.GCS_BUCKET!;
 
 const db = new Firestore({ projectId: process.env.GCP_PROJECT_ID });
 
