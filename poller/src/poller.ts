@@ -6,7 +6,7 @@ import { formatHomework, formatHomeworkOverdue, formatHomeworkStatusChange, form
 import { analyseAnnouncement, summariseHomework, summariseActivity } from './claude.js';
 import { ensureCalendarsExist, createCalendarEvents, updateCalendarEventTitles } from './calendar.js';
 import { ensureTaskListsExist, createHomeworkTask, updateHomeworkTaskStatus, type HomeworkStatus } from './tasks.js';
-import { getEnabledKeys, getEnabledFcmTokens, getEnabledOneSignalIds } from './prefs.js';
+import { getEnabledKeys, getEnabledFcmTokens, getEnabledOneSignalIds, getAllPrefs } from './prefs.js';
 import { archiveAnnouncement, downloadAndSaveAttachments, downloadHomeworkAttachments } from './archive.js';
 
 export async function pollClassCharts(): Promise<void> {
