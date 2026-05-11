@@ -46,7 +46,7 @@ const DEPENDENCIES: Record<string, DependencyInfo> = {
     what: 'Attachment files (PDFs, converted docs), allowed-users.json, user-prefs.json',
     why: 'Permanent storage for school documents (announcement and homework attachments). Without it attachments cannot be saved or served. Auth config cannot be read.',
     when: 'Written when new announcement or homework attachments are downloaded. Read by frontend on Documents page and at auth time.',
-    with: 'Google Cloud Storage via @google-cloud/storage. Bucket: classcharts-attachments. LibreOffice used for docx/pptx/xlsx → PDF conversion before upload.',
+    with: 'Google Cloud Storage via @google-cloud/storage. Bucket: classcharts-attachments. Key paths: config/user-prefs.json (notification prefs + OneSignal IDs), config/subject-map.json (lesson code → subject name), attachments/{studentId}/{announcementId}/ and homework/{studentId}/{homeworkId}/. LibreOffice used for docx/pptx/xlsx → PDF conversion.',
   },
   pubsub: {
     label: 'Pub/Sub + Cloud Scheduler',
@@ -73,7 +73,7 @@ const DEPENDENCIES: Record<string, DependencyInfo> = {
   fcm: {
     label: 'OneSignal',
     what: 'Push notifications to parents for new homework, behaviour, announcements, attendance alerts',
-    why: 'Push notifications via Firebase Cloud Messaging. Both Pushover and FCM can run in parallel; each channel toggled independently from Settings → Notification Channels (admin only). Defaults: Pushover on, FCM off.',
+    why: 'Rich web push notifications to installed PWAs. Both OneSignal and Pushover can run in parallel; each toggled independently from Settings → Notification Channels (admin only). Defaults: both on. Degrades gracefully — data is still archived if OneSignal fails.',
     when: 'Called for each new event detected by the poller.',
     with: 'OneSignal REST API v1 /notifications. Subscription IDs registered per-device via /settings → Enable notifications, stored in GCS user-prefs.json. If red: check ONESIGNAL_API_KEY and ONESIGNAL_APP_ID in Secret Manager, verify users have visited /settings and registered their device.',
     degradesGracefully: true,
