@@ -1,6 +1,6 @@
 import { loginAllParents, todayStr, daysAgoStr } from '@classcharts/shared';
 import type { CCStudent } from '@classcharts/shared';
-import { getState, saveState, writeHeartbeat } from './state.js';
+import { getState, saveState, writeHeartbeat, loadSubjectMap, saveSubjectMap } from './state.js';
 import { sendNotification } from './notify.js';
 import { formatHomework, formatHomeworkOverdue, formatHomeworkStatusChange, formatActivity, formatAnnouncement, formatAttendance, formatDetention } from './formatter.js';
 import { analyseAnnouncement, summariseHomework, summariseActivity } from './claude.js';
@@ -307,6 +307,25 @@ ${(err as any)?.stack ?? ''}`,
       }
 
       if (changed) { state.updatedAt = new Date().toISOString(); await saveState(state); }
+
+      // ── Subject map ───────────────────────────────────────────
+      try {
+        const lessons = await client.getLessons(todayStr());
+        const existing = await loadSubjectMap();
+        let updated = false;
+        for (const lesson of lessons) {
+          if (!lesson.lessonName || !lesson.subjectName || lesson.isBreak) continue;
+          const parts = lesson.lessonName.split('/');
+          const code = parts[parts.length - 1]?.trim();
+          if (code && !existing[code]) {
+            existing[code] = lesson.subjectName;
+            updated = true;
+          }
+        }
+        if (updated) { await saveSubjectMap(existing); console.log(`  Subject map updated: ${JSON.stringify(existing)}`); }
+      } catch (mapErr) {
+        console.warn(`  Subject map update failed for ${pupil.name}:`, mapErr);
+      }
     }
   }
 
