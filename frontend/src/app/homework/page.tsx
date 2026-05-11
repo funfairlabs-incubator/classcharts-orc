@@ -136,12 +136,13 @@ export default function HomeworkPage() {
       if (title.includes(keyword)) return subject;
     }
 
-    // Last resort: return lesson string or empty
+    // Last resort: if lesson is just a year group number (e.g. '8', '9') label as General
+    if (/^\d+$/.test(hw.lesson ?? '')) return 'General';
     return hw.lesson || '';
   }
 
   const subjects = useMemo(() => {
-    const s = new Set(all.map(h => resolveSubject(h)).filter(Boolean));
+    const s = new Set(all.map(h => resolveSubject(h)).filter(s => Boolean(s) && s !== 'General'));
     return [...s].sort();
   }, [all]);
 
