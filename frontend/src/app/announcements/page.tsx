@@ -24,6 +24,37 @@ function usePupilAnnouncements(pupilId: number | undefined) {
   );
 }
 
+// Allowlist-based HTML sanitiser — only permits known-safe tags and href/target attrs.
+// All other tags are stripped (content preserved), all other attributes removed.
+function sanitiseHtml(html: string): string {
+  // 1. Strip the content AND tags of known dangerous block elements
+  const dangerous = ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'button'];
+  let safe = html;
+  for (const tag of dangerous) {
+    // Remove opening tag, content, closing tag
+    safe = safe.replace(new RegExp(`<${tag}(\\s[^>]*)?>.*?<\\/${tag}>`, 'gis'), '');
+    // Remove self-closing variants
+    safe = safe.replace(new RegExp(`<${tag}(\\s[^>]*)?/?>`, 'gi'), '');
+  }
+
+  // 2. For all remaining tags, remove all attributes except href and target on <a>
+  safe = safe.replace(/<([a-z][a-z0-9]*)(\s[^>]*)?>/gi, (_match, tag: string, attrs: string) => {
+    const t = tag.toLowerCase();
+    if (t === 'a' && attrs) {
+      // Only keep href (non-javascript) and target
+      const href = attrs.match(/href=["']([^"']*?)["']/i)?.[1] ?? '';
+      const safeHref = /^javascript:/i.test(href) ? '#' : href;
+      const target = attrs.match(/target=["']([^"']*?)["']/i)?.[1] ?? '_blank';
+      return safeHref ? `<a href="${safeHref}" target="${target}" rel="noopener noreferrer">` : '<a>';
+    }
+    // Allow safe formatting tags with no attributes
+    const allowed = ['p','br','b','strong','em','i','u','ul','ol','li','h1','h2','h3','h4','h5','h6','div','span','hr','blockquote'];
+    return allowed.includes(t) ? `<${t}>` : '';
+  });
+
+  return safe;
+}
+
 export default function AnnouncementsPage() {
   const { pupils } = usePupil();
   const [filterStudent, setFilterStudent] = useState<number | 'all'>('all');
@@ -184,8 +215,11 @@ export default function AnnouncementsPage() {
               )}
 
               {/* Description */}
-              {ann.descriptionText && (
-                <p style={styles.annBody}>{ann.descriptionText}</p>
+              {ann.descriptionHtml && (
+                <div
+                  style={styles.annBody}
+                  dangerouslySetInnerHTML={{ __html: sanitiseHtml(ann.descriptionHtml) }}
+                />
               )}
 
               {/* Action required */}
