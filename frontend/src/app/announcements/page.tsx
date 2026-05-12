@@ -24,6 +24,19 @@ function usePupilAnnouncements(pupilId: number | undefined) {
   );
 }
 
+// Strip dangerous tags/attrs but keep links, basic formatting and line breaks
+function sanitiseHtml(html: string): string {
+  return html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, '')
+    .replace(/<embed[^>]*>/gi, '')
+    .replace(/\son\w+="[^"]*"/gi, '')   // remove event handlers
+    .replace(/\son\w+='[^']*'/gi, '')
+    .replace(/href="javascript:[^"]*"/gi, 'href="#"')
+    .replace(/href='javascript:[^']*'/gi, "href='#'");
+}
+
 export default function AnnouncementsPage() {
   const { pupils } = usePupil();
   const [filterStudent, setFilterStudent] = useState<number | 'all'>('all');
@@ -184,8 +197,11 @@ export default function AnnouncementsPage() {
               )}
 
               {/* Description */}
-              {ann.descriptionText && (
-                <p style={styles.annBody}>{ann.descriptionText}</p>
+              {ann.descriptionHtml && (
+                <div
+                  style={styles.annBody}
+                  dangerouslySetInnerHTML={{ __html: sanitiseHtml(ann.descriptionHtml) }}
+                />
               )}
 
               {/* Action required */}
