@@ -217,6 +217,7 @@ export default function AnnouncementsPage() {
               {/* Description */}
               {ann.descriptionHtml && (
                 <div
+                  className="ann-body"
                   style={styles.annBody}
                   dangerouslySetInnerHTML={{ __html: sanitiseHtml(ann.descriptionHtml) }}
                 />
